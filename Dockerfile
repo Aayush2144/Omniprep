@@ -1,7 +1,10 @@
 # Multi-Stage Dockerfile for OmniPrep Suite
 # Step 1: Build the React frontend
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
+
+# Install compilation tools for native SQLite bindings
+RUN apk add --no-cache python3 make g++
 
 # Install dependencies
 COPY package*.json ./
@@ -12,17 +15,17 @@ COPY . .
 RUN npm run build
 
 # Step 2: Production Runtime
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=5000
 
-# Install production dependencies only (including native better-sqlite3 build tools)
-RUN apk add --no-cache python3 make g++ 
+# Install runtime compilation tools
+RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Copy built frontend assets and backend server
 COPY --from=builder /app/dist ./dist
