@@ -38,10 +38,12 @@ import {
 import { HeatmapCalendar } from './HeatmapCalendar';
 import { DailyChecklist } from './DailyChecklist';
 import { calculateOverallAnalytics } from '../../utils/analyticsCalculators';
+import { calculateGamification } from '../../utils/gamification.js';
 
 export const OverviewDashboard = () => {
   const { data, setActiveTab, setTimerState } = useTracker();
   const analytics = calculateOverallAnalytics(data);
+  const game = calculateGamification(data);
 
   const pillars = [
     {
@@ -118,6 +120,58 @@ export const OverviewDashboard = () => {
             <Play className="w-4 h-4 fill-white" />
             <span>Launch Focus Studio</span>
           </button>
+        </div>
+      </div>
+
+      {/* GAMIFICATION & LEVEL PROGRESSION BANNER */}
+      <div className="glass-panel p-5 rounded-3xl border border-indigo-500/20 bg-gradient-to-r from-purple-950/30 via-slate-900/80 to-indigo-950/40 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 via-purple-600 to-indigo-600 p-0.5 flex items-center justify-center shadow-lg shadow-indigo-600/30">
+              <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center font-black text-amber-400 text-sm">
+                Lvl {game.level}
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="font-extrabold text-white text-base">{game.title}</h3>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono font-semibold border border-indigo-500/30">
+                  {game.totalXp} Total XP ⚡
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                {game.xpInCurrentLevel} / {game.xpNeededForNext} XP to reach Level {game.level + 1}
+              </p>
+            </div>
+          </div>
+
+          {/* Badges Preview */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {game.allBadges.map((badge) => (
+              <div
+                key={badge.id}
+                title={`${badge.name}: ${badge.desc} (${badge.unlocked ? 'Unlocked! 🏆' : 'Locked 🔒'})`}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold border transition ${
+                  badge.unlocked
+                    ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 shadow-sm'
+                    : 'bg-slate-900/60 text-slate-500 border-white/5 opacity-50 grayscale'
+                }`}
+              >
+                <span>{badge.icon}</span>
+                <span className="text-[11px] hidden md:inline">{badge.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Level XP Progress Bar */}
+        <div className="space-y-1">
+          <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-white/5">
+            <div
+              className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-400 rounded-full transition-all duration-700"
+              style={{ width: `${game.progressPct}%` }}
+            />
+          </div>
         </div>
       </div>
 

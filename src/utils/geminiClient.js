@@ -77,6 +77,10 @@ async function callDirectBrowserGemini(apiKey, model, systemInstruction, promptT
   return text;
 }
 
+export async function callGeminiRest(apiKey, systemInstruction, promptText, model = 'gemini-2.0-flash', expectJson = true) {
+  return callDirectBrowserGemini(apiKey, model, systemInstruction, promptText, expectJson);
+}
+
 // ==========================================
 // GEMINI API CALLERS (Direct + Proxy Fallback)
 // ==========================================

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { getStoredApiKey } from '../../utils/geminiClient.js';
 import { ApiKeyModal } from '../ai/ApiKeyModal.jsx';
+import { calculateGamification } from '../../utils/gamification.js';
 
 export const Header = () => {
   const { data, dbStatus, timerState, setTimerState, exportDataJson, importDataJson, resetToZeroData, setActiveTab } = useTracker();
@@ -29,13 +30,34 @@ export const Header = () => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [liveStudierCount, setLiveStudierCount] = useState(0);
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
   const fileInputRef = useRef(null);
 
+  const game = calculateGamification(data);
   const hasApiKey = Boolean(getStoredApiKey());
   const todayStr = new Date().toISOString().split('T')[0];
   const todayLog = (data.activityLogs || []).find(l => l.date === todayStr) || { total: 0 };
   const dailyGoal = data.profile?.dailyHourGoal || 7.5;
   const progressPct = dailyGoal > 0 ? Math.min(100, Math.round(((todayLog.total || 0) / dailyGoal) * 100)) : 0;
+
+  // Listen for PWA Install Prompt
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
 
   // Poll live studiers count and active announcements
   useEffect(() => {
@@ -136,6 +158,23 @@ export const Header = () => {
         {/* Right: Streak, Daily Progress, Timer trigger, & User Profile Dropdown */}
         <div className="flex items-center space-x-2 sm:space-x-4">
           
+          {/* PWA Install Button (If installable) */}
+          {deferredPrompt && (
+            <button
+              onClick={handleInstallPwa}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 transition animate-bounce"
+              title="Install OmniPrep as Native App on your Device"
+            >
+              <span>Install App 📱</span>
+            </button>
+          )}
+
+          {/* Gamification Level Pill */}
+          <div className="hidden sm:flex items-center space-x-1.5 bg-gradient-to-r from-purple-500/15 to-indigo-500/15 border border-purple-500/30 px-3 py-1.5 rounded-full text-purple-300 text-xs font-bold font-mono">
+            <span>⭐ Lvl {game.level}</span>
+            <span className="text-[10px] text-slate-400 font-normal hidden md:inline">({game.totalXp} XP)</span>
+          </div>
+
           {/* Streak Pill */}
           <div className="hidden sm:flex items-center space-x-1.5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 px-3 py-1.5 rounded-full text-amber-400 text-xs font-semibold">
             <Flame className="w-4 h-4 text-orange-500 fill-orange-500" />

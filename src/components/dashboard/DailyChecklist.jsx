@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { useTracker } from '../../context/TrackerContext';
 import { CheckSquare, Square, Plus, Trash2, CheckCircle2, Clock, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { AiRoutinePlannerModal } from './AiRoutinePlannerModal.jsx';
 
 export const DailyChecklist = () => {
   const { data, toggleRoutine, addRoutine, deleteRoutine } = useTracker();
   const [isAdding, setIsAdding] = useState(false);
+  const [isAiPlannerOpen, setIsAiPlannerOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newPeriod, setNewPeriod] = useState('Core Work');
   const [newCategory, setNewCategory] = useState('gate');
@@ -61,11 +63,18 @@ export const DailyChecklist = () => {
             {completedCount}/{totalCount} ({percentage}%)
           </span>
           <button
+            onClick={() => setIsAiPlannerOpen(true)}
+            className="p-1 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow transition text-xs flex items-center gap-1 px-2.5 font-semibold"
+          >
+            <Sparkles className="w-3 h-3" />
+            <span>AI Planner 🪄</span>
+          </button>
+          <button
             onClick={() => setIsAdding(!isAdding)}
             className="p-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition text-xs flex items-center gap-1 px-2"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Add</span>
+            <span>Custom</span>
           </button>
         </div>
       </div>
@@ -188,6 +197,12 @@ export const DailyChecklist = () => {
           );
         })}
       </div>
+
+      {/* AI Daily Routine & Schedule Planner Modal */}
+      <AiRoutinePlannerModal
+        isOpen={isAiPlannerOpen}
+        onClose={() => setIsAiPlannerOpen(false)}
+      />
     </div>
   );
 };

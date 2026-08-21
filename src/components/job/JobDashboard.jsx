@@ -15,11 +15,12 @@ import { DataScienceRevision } from './DataScienceRevision.jsx';
 import { DsaTracker } from './DsaTracker.jsx';
 import { ApplicationKanban } from './ApplicationKanban.jsx';
 import { AiInterviewStudio } from './AiInterviewStudio.jsx';
+import { AiResumeAnalyzer } from './AiResumeAnalyzer.jsx';
 import { calculateJobAnalytics } from '../../utils/analyticsCalculators.js';
 
 export const JobDashboard = () => {
   const { data, setActiveTab, setAnalyticsCategory } = useTracker();
-  const [subTab, setSubTab] = useState('aiInterview'); // 'aiInterview' | 'dsRevision' | 'dsa' | 'kanban'
+  const [subTab, setSubTab] = useState('aiInterview'); // 'aiInterview' | 'resumeMatcher' | 'dsRevision' | 'dsa' | 'kanban'
   const analytics = calculateJobAnalytics(data.job, data.activityLogs);
 
   const goToJobAnalytics = () => {
@@ -130,6 +131,18 @@ export const JobDashboard = () => {
         </button>
 
         <button
+          onClick={() => setSubTab('resumeMatcher')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${
+            subTab === 'resumeMatcher'
+              ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <span>📄 AI Resume & ATS Matcher</span>
+        </button>
+
+        <button
           onClick={() => setSubTab('dsRevision')}
           className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${
             subTab === 'dsRevision'
@@ -169,6 +182,7 @@ export const JobDashboard = () => {
       {/* Sub-Tab View Rendering */}
       <div>
         {subTab === 'aiInterview' && <AiInterviewStudio />}
+        {subTab === 'resumeMatcher' && <AiResumeAnalyzer />}
         {subTab === 'dsRevision' && <DataScienceRevision />}
         {subTab === 'dsa' && <DsaTracker />}
         {subTab === 'kanban' && <ApplicationKanban />}

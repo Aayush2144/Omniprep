@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Filter
 } from 'lucide-react';
+import { AiFlashcardGeneratorModal } from '../ai/AiFlashcardGeneratorModal.jsx';
 
 export const DataScienceRevision = () => {
   const { data, updateDsRevisionTopic, addDsRevisionTopic, addDsFlashcard } = useTracker();
@@ -25,6 +26,7 @@ export const DataScienceRevision = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isAddingTopic, setIsAddingTopic] = useState(false);
   const [isAddingCard, setIsAddingCard] = useState(false);
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   
   // Flashcard Viewer State
   const [activeCardIndex, setActiveCardIndex] = useState(0);
@@ -125,12 +127,21 @@ export const DataScienceRevision = () => {
               ({activeCardIndex + 1} of {dsRevision.flashcards?.length || 0})
             </span>
           </div>
-          <button
-            onClick={() => setIsAddingCard(!isAddingCard)}
-            className="text-xs text-amber-400 hover:underline flex items-center gap-1"
-          >
-            <Plus className="w-3 h-3" /> Add Flashcard
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setIsAiModalOpen(true)}
+              className="px-2.5 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg text-xs font-semibold shadow transition flex items-center gap-1"
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>Generate with AI 🪄</span>
+            </button>
+            <button
+              onClick={() => setIsAddingCard(!isAddingCard)}
+              className="text-xs text-amber-400 hover:underline flex items-center gap-1 pl-2 border-l border-white/10"
+            >
+              <Plus className="w-3 h-3" /> Custom Card
+            </button>
+          </div>
         </div>
 
         {isAddingCard && (
@@ -364,6 +375,12 @@ export const DataScienceRevision = () => {
           );
         })}
       </div>
+
+      {/* AI Flashcard Generator Modal */}
+      <AiFlashcardGeneratorModal
+        isOpen={isAiModalOpen}
+        onClose={() => setIsAiModalOpen(false)}
+      />
 
     </div>
   );
