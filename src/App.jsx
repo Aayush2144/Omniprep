@@ -1,11 +1,11 @@
 import React, { Component } from 'react';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { TrackerProvider, useTracker } from './context/TrackerContext';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { QuickTimerBar } from './components/layout/QuickTimerBar';
 import { FocusTimerModal } from './components/timer/FocusTimerModal';
-import { AuthModal } from './components/auth/AuthModal';
+import { AuthGate } from './components/auth/AuthGate';
 import { OverviewDashboard } from './components/dashboard/OverviewDashboard';
 import { GateDashboard } from './components/gate/GateDashboard';
 import { AcademicDashboard } from './components/academic/AcademicDashboard';
@@ -60,6 +60,7 @@ class ErrorBoundary extends Component {
 
 const AppContent = () => {
   const { activeTab } = useTracker();
+  const { isAdmin } = useAuth();
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[#090d16] text-slate-100 selection:bg-indigo-500 selection:text-white">
@@ -78,15 +79,29 @@ const AppContent = () => {
           {activeTab === 'job' && <JobDashboard />}
           {activeTab === 'english' && <EnglishDashboard />}
           {activeTab === 'analytics' && <MasterAnalytics />}
-          {activeTab === 'admin' && <AdminDashboard />}
+          {activeTab === 'admin' && (isAdmin ? <AdminDashboard /> : <OverviewDashboard />)}
         </main>
       </div>
 
-      {/* Persistent Global Focus Timer & Auth Modal */}
+      {/* Persistent Global Focus Timer */}
       <FocusTimerModal />
       <QuickTimerBar />
-      <AuthModal />
     </div>
+  );
+};
+
+const RootRouter = () => {
+  const { currentUser } = useAuth();
+
+  // If user is not logged in, show the Login / Signup Gate first!
+  if (!currentUser) {
+    return <AuthGate />;
+  }
+
+  return (
+    <TrackerProvider>
+      <AppContent />
+    </TrackerProvider>
   );
 };
 
@@ -94,9 +109,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <TrackerProvider>
-          <AppContent />
-        </TrackerProvider>
+        <RootRouter />
       </AuthProvider>
     </ErrorBoundary>
   );

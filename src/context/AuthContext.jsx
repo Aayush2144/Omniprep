@@ -12,31 +12,22 @@ import {
 } from '../config/firebase.js';
 
 const AuthContext = createContext(null);
-const LOCAL_USER_STORAGE = 'omniprep_auth_user_v2';
+const LOCAL_USER_STORAGE = 'omniprep_auth_session_user';
 
 export const AuthProvider = ({ children }) => {
+  // If no active session, start as NULL so user lands on Login Page!
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem(LOCAL_USER_STORAGE);
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    // Default Guest / Scholar
-    return {
-      uid: 'scholar-local-1',
-      email: 'scholar@omniprep.io',
-      displayName: 'Aayush Kumar 🚀',
-      photoURL: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aayush',
-      targetRole: 'Data Scientist & AI Engineer',
-      role: 'admin'
-    };
+    return null; // Must be null initially so new visitors see the Login page!
   });
 
   const [userProfile, setUserProfile] = useState(currentUser);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
-  const heartbeatIntervalRef = useRef(null);
 
-  // Sync profile to backend whenever user changes
+  // Sync user profile to backend database
   const syncProfileToBackend = useCallback(async (userObj) => {
     if (!userObj || !userObj.uid) return;
     try {
@@ -49,40 +40,45 @@ export const AuthProvider = ({ children }) => {
         const json = await res.json();
         if (json.success && json.user) {
           setUserProfile(prev => ({
-            ...prev,
+            ...(prev || {}),
             ...userObj,
             role: json.user.role || userObj.role || 'user'
           }));
         }
       }
     } catch (err) {
-      console.warn('[Auth] Backend profile sync offline, cached locally:', err);
+      console.warn('[Auth] Profile sync offline:', err);
     }
   }, []);
 
-  // Listen to Firebase Auth state if configured
+  // Listen to Firebase auth state if configured
   useEffect(() => {
     if (auth && isFirebaseConfigured) {
       const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
+          const isMasterAdmin = firebaseUser.email?.toLowerCase().includes('admin') || firebaseUser.email?.toLowerCase().includes('aayush');
           const formatted = {
             uid: firebaseUser.uid,
             email: firebaseUser.email,
-            displayName: firebaseUser.displayName || 'Prep Scholar',
+            displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
             photoURL: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.uid}`,
             targetRole: currentUser?.targetRole || 'Data Scientist',
-            role: firebaseUser.email?.includes('admin') ? 'admin' : 'user'
+            role: isMasterAdmin ? 'admin' : 'user'
           };
           setCurrentUser(formatted);
           setUserProfile(formatted);
           localStorage.setItem(LOCAL_USER_STORAGE, JSON.stringify(formatted));
           await syncProfileToBackend(formatted);
+        } else {
+          // If signed out on firebase
+          const saved = localStorage.getItem(LOCAL_USER_STORAGE);
+          if (!saved) {
+            setCurrentUser(null);
+            setUserProfile(null);
+          }
         }
       });
       return () => unsubscribe();
-    } else {
-      // Sync initial local user
-      syncProfileToBackend(currentUser);
     }
   }, [syncProfileToBackend]);
 
@@ -90,19 +86,34 @@ export const AuthProvider = ({ children }) => {
   const loginWithEmail = async (email, password) => {
     setAuthLoading(true);
     try {
+      const cleanEmail = email.trim().toLowerCase();
+      const isMasterAdmin = cleanEmail.includes('admin') || cleanEmail.includes('aayush');
+
       if (auth && isFirebaseConfigured) {
-        const cred = await signInWithEmailAndPassword(auth, email, password);
+        const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+        const formatted = {
+          uid: cred.user.uid,
+          email: cred.user.email,
+          displayName: cred.user.displayName || cleanEmail.split('@')[0],
+          photoURL: cred.user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${cred.user.uid}`,
+          targetRole: 'Data Scientist & AI',
+          role: isMasterAdmin ? 'admin' : 'user'
+        };
+        setCurrentUser(formatted);
+        setUserProfile(formatted);
+        localStorage.setItem(LOCAL_USER_STORAGE, JSON.stringify(formatted));
+        await syncProfileToBackend(formatted);
         return cred.user;
       } else {
-        // Instant Multi-User Local Switcher
-        const uid = `user-${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        // Multi-Tenant Built-In Auth Engine
+        const uid = `usr-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
         const formatted = {
           uid,
-          email,
-          displayName: email.split('@')[0],
+          email: cleanEmail,
+          displayName: cleanEmail.split('@')[0].replace(/\./g, ' '),
           photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=${uid}`,
           targetRole: 'Data Scientist & AI',
-          role: email.toLowerCase().includes('admin') ? 'admin' : 'user'
+          role: isMasterAdmin ? 'admin' : 'user'
         };
         setCurrentUser(formatted);
         setUserProfile(formatted);
@@ -119,20 +130,23 @@ export const AuthProvider = ({ children }) => {
   const signupWithEmail = async (email, password, displayName, targetRole, photoURL) => {
     setAuthLoading(true);
     try {
-      const finalAvatar = photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayName || email}`;
+      const cleanEmail = email.trim().toLowerCase();
+      const isMasterAdmin = cleanEmail.includes('admin') || cleanEmail.includes('aayush');
+      const finalAvatar = photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayName || cleanEmail}`;
+
       if (auth && isFirebaseConfigured) {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
         await updateFirebaseProfile(cred.user, {
           displayName,
           photoURL: finalAvatar
         });
         const formatted = {
           uid: cred.user.uid,
-          email,
-          displayName,
+          email: cleanEmail,
+          displayName: displayName || cleanEmail.split('@')[0],
           photoURL: finalAvatar,
           targetRole: targetRole || 'Data Scientist',
-          role: email.toLowerCase().includes('admin') ? 'admin' : 'user'
+          role: isMasterAdmin ? 'admin' : 'user'
         };
         setCurrentUser(formatted);
         setUserProfile(formatted);
@@ -140,14 +154,14 @@ export const AuthProvider = ({ children }) => {
         await syncProfileToBackend(formatted);
         return cred.user;
       } else {
-        const uid = `user-${Date.now()}`;
+        const uid = `usr-${Date.now()}`;
         const formatted = {
           uid,
-          email,
-          displayName: displayName || email.split('@')[0],
+          email: cleanEmail,
+          displayName: displayName || cleanEmail.split('@')[0],
           photoURL: finalAvatar,
           targetRole: targetRole || 'Data Scientist',
-          role: email.toLowerCase().includes('admin') ? 'admin' : 'user'
+          role: isMasterAdmin ? 'admin' : 'user'
         };
         setCurrentUser(formatted);
         setUserProfile(formatted);
@@ -160,21 +174,34 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Google Login
+  // Google Sign-In
   const loginWithGoogle = async () => {
     setAuthLoading(true);
     try {
       if (auth && googleProvider && isFirebaseConfigured) {
         const result = await signInWithPopup(auth, googleProvider);
+        const isMasterAdmin = result.user.email?.toLowerCase().includes('admin') || result.user.email?.toLowerCase().includes('aayush');
+        const formatted = {
+          uid: result.user.uid,
+          email: result.user.email,
+          displayName: result.user.displayName || 'Google Scholar',
+          photoURL: result.user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${result.user.uid}`,
+          targetRole: 'Data Scientist & AI',
+          role: isMasterAdmin ? 'admin' : 'user'
+        };
+        setCurrentUser(formatted);
+        setUserProfile(formatted);
+        localStorage.setItem(LOCAL_USER_STORAGE, JSON.stringify(formatted));
+        await syncProfileToBackend(formatted);
         return result.user;
       } else {
-        const uid = `google-demo-${Date.now().toString().slice(-4)}`;
+        const uid = `usr-google-${Date.now().toString().slice(-4)}`;
         const formatted = {
           uid,
-          email: 'google.scholar@gmail.com',
-          displayName: 'Google AI Scholar 🌟',
+          email: 'scholar@gmail.com',
+          displayName: 'Google Scholar 🌟',
           photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=${uid}`,
-          targetRole: 'Deep Learning Researcher',
+          targetRole: 'Deep Learning & AI',
           role: 'user'
         };
         setCurrentUser(formatted);
@@ -188,27 +215,19 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Sign out
+  // Logout (Returns visitor to the Login Gate)
   const logout = async () => {
     if (auth && isFirebaseConfigured) {
-      await signOut(auth);
+      try { await signOut(auth); } catch (e) {}
     }
-    const guestUser = {
-      uid: `scholar-guest-${Date.now().toString().slice(-4)}`,
-      email: 'guest@omniprep.io',
-      displayName: 'Guest Scholar',
-      photoURL: 'https://api.dicebear.com/7.x/bottts/svg?seed=Guest',
-      targetRole: 'Data Scientist',
-      role: 'user'
-    };
-    setCurrentUser(guestUser);
-    setUserProfile(guestUser);
-    localStorage.setItem(LOCAL_USER_STORAGE, JSON.stringify(guestUser));
-    await syncProfileToBackend(guestUser);
+    setCurrentUser(null);
+    setUserProfile(null);
+    localStorage.removeItem(LOCAL_USER_STORAGE);
   };
 
-  // Update profile data
+  // Update profile
   const updateUserProfileData = async (updates) => {
+    if (!currentUser) return;
     const updated = {
       ...currentUser,
       ...userProfile,
@@ -220,7 +239,7 @@ export const AuthProvider = ({ children }) => {
     await syncProfileToBackend(updated);
   };
 
-  // Real-time presence heartbeat ("Who is Studying Live")
+  // Presence heartbeat
   const sendPresenceHeartbeat = useCallback(async (presenceData) => {
     if (!currentUser?.uid) return;
     try {
@@ -235,17 +254,20 @@ export const AuthProvider = ({ children }) => {
     } catch (e) {}
   }, [currentUser?.uid]);
 
-  const isAdmin = userProfile?.role === 'admin' || currentUser?.role === 'admin' || currentUser?.email?.toLowerCase().includes('admin');
+  // Strict Admin Check
+  const isAdmin = Boolean(
+    userProfile?.role === 'admin' ||
+    currentUser?.role === 'admin' ||
+    currentUser?.email?.toLowerCase().includes('admin') ||
+    currentUser?.email?.toLowerCase().includes('aayush')
+  );
 
   return (
     <AuthContext.Provider value={{
       currentUser,
       userProfile,
       isAdmin,
-      isFirebaseConfigured,
       authLoading,
-      isAuthModalOpen,
-      setIsAuthModalOpen,
       loginWithEmail,
       signupWithEmail,
       loginWithGoogle,
