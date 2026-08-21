@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useTracker } from '../../context/TrackerContext.jsx';
 import {
   Shield,
   Users,
@@ -16,11 +17,13 @@ import {
   UserCheck,
   UserX,
   Send,
-  Database
+  Database,
+  RotateCcw
 } from 'lucide-react';
 
 export const AdminDashboard = () => {
   const { currentUser, userProfile, isAdmin, updateUserProfileData } = useAuth();
+  const { resetToZeroData } = useTracker();
 
   const [metrics, setMetrics] = useState({
     totalUsers: 0,
@@ -477,6 +480,30 @@ export const AdminDashboard = () => {
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      {/* SECTION 4: DANGER ZONE (ADMIN ONLY) */}
+      <div className="glass-panel p-6 rounded-3xl border border-rose-500/20 bg-gradient-to-r from-rose-950/30 via-slate-900/60 to-slate-900/60 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2 text-rose-400 text-xs font-bold uppercase tracking-wider">
+              <AlertTriangle className="w-4 h-4 text-rose-400" />
+              <span>Admin Danger Zone</span>
+            </div>
+            <h3 className="text-base font-bold text-white">Reset Platform & Analytics State to Zero</h3>
+            <p className="text-xs text-slate-400">
+              Only accessible by verified Administrators. This clears your workspace logs and restores initial baseline.
+            </p>
+          </div>
+
+          <button
+            onClick={resetToZeroData}
+            className="px-5 py-2.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-lg shrink-0"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span>Reset Workspace Data to Zero</span>
+          </button>
         </div>
       </div>
 

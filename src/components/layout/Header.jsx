@@ -198,13 +198,16 @@ export const Header = () => {
               className="hidden"
             />
 
-            <button
-              onClick={resetToZeroData}
-              title="Reset All Analytics & Routine to ZERO State"
-              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800/60 rounded-lg transition"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
+            {/* Reset Button (STRICTLY ADMIN ONLY) */}
+            {isAdmin && (
+              <button
+                onClick={resetToZeroData}
+                title="Reset All Analytics & Routine to ZERO State (Admin Only)"
+                className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800/60 rounded-lg transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {/* USER PROFILE & AUTH DROPDOWN */}
