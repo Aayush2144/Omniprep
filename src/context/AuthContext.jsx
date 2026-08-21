@@ -254,6 +254,30 @@ export const AuthProvider = ({ children }) => {
     } catch (e) {}
   }, [currentUser?.uid]);
 
+  // Claim Admin with Master Security PIN
+  const claimAdminRole = async (masterPin) => {
+    if (!currentUser?.uid) return { success: false, error: 'Not signed in' };
+    try {
+      const res = await fetch('/api/admin/claim-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: currentUser.uid, masterPin })
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        const updated = { ...currentUser, ...userProfile, role: 'admin' };
+        setCurrentUser(updated);
+        setUserProfile(updated);
+        localStorage.setItem(LOCAL_USER_STORAGE, JSON.stringify(updated));
+        return { success: true };
+      } else {
+        return { success: false, error: json.error || 'Failed to claim admin' };
+      }
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
   // Strict Admin Check
   const isAdmin = Boolean(
     userProfile?.role === 'admin' ||
@@ -273,7 +297,8 @@ export const AuthProvider = ({ children }) => {
       loginWithGoogle,
       logout,
       updateUserProfileData,
-      sendPresenceHeartbeat
+      sendPresenceHeartbeat,
+      claimAdminRole
     }}>
       {children}
     </AuthContext.Provider>

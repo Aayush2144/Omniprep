@@ -197,6 +197,23 @@ app.post('/api/admin/set-role', async (req, res) => {
   }
 });
 
+// 3b. Claim Admin with Master Security Key
+app.post('/api/admin/claim-admin', async (req, res) => {
+  try {
+    const { uid, masterPin } = req.body;
+    const MASTER_SECRET = process.env.ADMIN_MASTER_PIN || 'OmniAdmin2026';
+    
+    if (masterPin !== MASTER_SECRET) {
+      return res.status(403).json({ success: false, error: 'Incorrect Master Admin PIN' });
+    }
+
+    const user = await setUserRole(uid, 'admin');
+    res.json({ success: true, message: 'Admin permissions granted successfully!', user });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 4. Create Broadcast Announcement
 app.post('/api/admin/announcements', async (req, res) => {
   try {

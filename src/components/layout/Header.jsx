@@ -23,7 +23,7 @@ import { ApiKeyModal } from '../ai/ApiKeyModal.jsx';
 
 export const Header = () => {
   const { data, dbStatus, timerState, setTimerState, exportDataJson, importDataJson, resetToZeroData, setActiveTab } = useTracker();
-  const { currentUser, userProfile, isAdmin, setIsAuthModalOpen, logout } = useAuth();
+  const { currentUser, userProfile, isAdmin, logout, claimAdminRole } = useAuth();
   
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -257,7 +257,7 @@ export const Header = () => {
                     <span>Live Study Hall & Ranks</span>
                   </button>
 
-                  {isAdmin && (
+                  {isAdmin ? (
                     <button
                       onClick={() => setActiveTab('admin')}
                       className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-purple-300 hover:text-white hover:bg-purple-950/40 transition text-left font-semibold"
@@ -265,15 +265,27 @@ export const Header = () => {
                       <Shield className="w-4 h-4 text-purple-400" />
                       <span>Admin Console 👑</span>
                     </button>
+                  ) : (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const pin = prompt('Enter Master Admin Security PIN:');
+                        if (pin) {
+                          const res = await claimAdminRole(pin.trim());
+                          if (res.success) {
+                            alert('👑 Admin permissions unlocked successfully!');
+                            setActiveTab('admin');
+                          } else {
+                            alert(res.error || 'Incorrect Admin PIN');
+                          }
+                        }
+                      }}
+                      className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-amber-300 hover:text-white hover:bg-amber-950/30 transition text-left font-semibold"
+                    >
+                      <Shield className="w-4 h-4 text-amber-400" />
+                      <span>Claim Admin Role 👑</span>
+                    </button>
                   )}
-
-                  <button
-                    onClick={() => setIsAuthModalOpen(true)}
-                    className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition text-left"
-                  >
-                    <User className="w-4 h-4 text-indigo-400" />
-                    <span>Switch Account / Sign In</span>
-                  </button>
                 </div>
 
                 {/* Sign Out Button */}
