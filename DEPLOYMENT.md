@@ -4,101 +4,56 @@ This document provides step-by-step instructions to deploy the **OmniPrep Master
 
 ---
 
-## 🌟 Option 1: Deploy on Render.com (Recommended — 100% Free & Easy)
+## 🐘 100% Persistent Data: Connect Free Cloud PostgreSQL on Render
 
-Render provides free hosting for full-stack Node.js + Express apps with persistent storage.
+On Render's free tier, containers restart when redeploying. To ensure **your database NEVER loses data across unlimited redeployments**, attach Render's free PostgreSQL database:
+
+### 2-Minute Setup:
+1. On **[dashboard.render.com](https://dashboard.render.com/)**, click **"New +"** (top right) $\rightarrow$ select **"PostgreSQL"**.
+2. Set:
+   - **Name**: `omniprep-db`
+   - **Database**: `omniprep`
+   - **Region**: Same region as your Web Service (e.g. *Singapore* or *Frankfurt*)
+   - **Plan**: `Free`
+3. Click **"Create Database"**.
+4. Once created, copy the **"Internal Database URL"** (e.g. `postgresql://omniprep:...@dpg-...:5432/omniprep`).
+5. Go to your **OmniPrep Web Service** $\rightarrow$ **Environment** tab $\rightarrow$ click **"Add Environment Variable"**:
+   - **Key**: `DATABASE_URL`
+   - **Value**: *(Paste the Internal Database URL you copied)*
+6. Click **"Save Changes"**.
+
+> **Result**: OmniPrep will automatically detect `DATABASE_URL`, connect to cloud PostgreSQL, and store all user records, study sessions, flashcards, notes, and leaderboards permanently in the cloud!
+
+---
+
+## 🌟 Deploying on Render.com (100% Free & Easy)
 
 ### Steps:
-1. **Push your code to GitHub / GitLab**:
+1. **Push your code to GitHub**:
    ```bash
-   git init
    git add .
    git commit -m "Deploy OmniPrep Suite"
-   git remote add origin https://github.com/YOUR_USERNAME/omniprep-tracker.git
-   git branch -M main
-   git push -u origin main
+   git push origin main
    ```
 
 2. **Go to Render**:
    - Visit [dashboard.render.com](https://dashboard.render.com/) and sign in with GitHub.
    - Click **"New +"** $\rightarrow$ **"Web Service"**.
-   - Select your `omniprep-tracker` repository.
+   - Select your `Omniprep` repository.
 
 3. **Configure the Web Service**:
-   - **Name**: `omniprep-tracker` (or your chosen name)
-   - **Region**: Choose the closest region (e.g., Singapore, Frankfurt, Oregon)
+   - **Name**: `omniprep`
+   - **Region**: Choose closest (e.g. *Singapore* or *Frankfurt*)
    - **Branch**: `main`
-   - **Runtime**: `Node`
-   - **Build Command**:
-     ```bash
-     npm install && npm run build
-     ```
-   - **Start Command**:
-     ```bash
-     npm start
-     ```
+   - **Language**: `Docker` *(or Node with `npm install && npm run build` & `npm start`)*
    - **Plan**: `Free`
 
-4. **Environment Variables (Optional)**:
-   - `NODE_ENV`: `production`
-   - `GEMINI_API_KEY`: *(Optional — users can also enter their key in the UI)*
-
-5. Click **"Deploy Web Service"**!
-   - Render will build the Vite React frontend, start the unified Express server, and give you a live URL (e.g., `https://omniprep-tracker.onrender.com`).
-
----
-
-## 🚂 Option 2: Deploy on Railway.app
-
-Railway offers fast, one-click deployments with built-in Docker support.
-
-### Steps:
-1. Visit [railway.app](https://railway.app/) and sign in with GitHub.
-2. Click **"New Project"** $\rightarrow$ **"Deploy from GitHub repo"**.
-3. Select your repository.
-4. Railway will automatically detect the `Dockerfile` or `package.json` and build the app.
-5. In **Settings** $\rightarrow$ **Networking**, click **"Generate Domain"** to get your public live URL.
-
----
-
-## 🐳 Option 3: Deploy with Docker (VPS / AWS / DigitalOcean / Linode)
-
-The project includes a multi-stage `Dockerfile` optimized for minimal size and high performance.
-
-### 1. Build the Docker image:
-```bash
-docker build -t omniprep-app .
-```
-
-### 2. Run the container:
-```bash
-docker run -d -p 5000:5000 --name omniprep -v $(pwd)/server:/app/server omniprep-app
-```
-
-### 3. Access the application:
-Open your browser at `http://YOUR_SERVER_IP:5000/`.
-
----
-
-## ⚡ Option 4: Deploy on Vercel (Frontend Focus)
-
-1. Push your project to GitHub.
-2. Import the project into [Vercel](https://vercel.com).
-3. Framework Preset: **Vite**.
-4. Output Directory: `dist`.
-5. Build Command: `npm run build`.
-6. Click **Deploy**.
+4. Click **"Deploy Web Service"**!
+   - Render gives you a live public HTTPS URL (e.g., `https://omniprep-wg7a.onrender.com`).
 
 ---
 
 ## 🔒 Gemini API Key Security in Production
 - Your Gemini API key is never hardcoded.
 - You can provide your Gemini API key in the web app UI by clicking **`Set Gemini Key 🔑`** in the top header.
-- Alternatively, you can set the `GEMINI_API_KEY` environment variable in your cloud dashboard.
-
----
-
-## 📦 Production Architecture Summary
-- **Frontend**: React 18 + Tailwind CSS + Lucide Icons + Recharts, pre-compiled into static bundle in `dist/`.
-- **Backend & Database**: Express.js + SQLite (`better-sqlite3`), running unified on a single port for zero-configuration deployments.
-- **AI Engine**: Direct Google Generative AI REST API with live dynamic model discovery (`gemini-2.0-flash`, `gemini-1.5-flash`).
+- Alternatively, you can set the `GEMINI_API_KEY` environment variable in your Render dashboard.

@@ -32,14 +32,14 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// Initialize Multi-User SQLite database
-initDatabase();
+// Initialize Multi-User SQLite / PostgreSQL database
+initDatabase().catch(err => console.error('[Database Init Error]:', err));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
-    database: 'SQLite (Multi-User & Live Presence)',
+    database: process.env.DATABASE_URL ? 'PostgreSQL (Cloud Persistent 🐘)' : 'SQLite (Local 💾)',
     aiSupported: true,
     environment: process.env.NODE_ENV || 'production',
     timestamp: new Date().toISOString()
@@ -51,9 +51,9 @@ app.get('/api/health', (req, res) => {
 // =========================================================
 
 // 1. Register or Update User Profile
-app.post('/api/user/profile', (req, res) => {
+app.post('/api/user/profile', async (req, res) => {
   try {
-    const user = registerOrUpdateUser(req.body);
+    const user = await registerOrUpdateUser(req.body);
     res.json({ success: true, user });
   } catch (error) {
     console.error('[API /api/user/profile Error]:', error);
@@ -62,10 +62,10 @@ app.post('/api/user/profile', (req, res) => {
 });
 
 // 2. Fetch Isolated User State
-app.get('/api/user/data', (req, res) => {
+app.get('/api/user/data', async (req, res) => {
   try {
     const { userId } = req.query;
-    const data = getUserState(userId, null);
+    const data = await getUserState(userId, null);
     res.json({ success: true, data });
   } catch (error) {
     console.error('[API /api/user/data Error]:', error);
@@ -74,13 +74,13 @@ app.get('/api/user/data', (req, res) => {
 });
 
 // 3. Sync User State
-app.post('/api/user/sync', (req, res) => {
+app.post('/api/user/sync', async (req, res) => {
   try {
     const { userId, state } = req.body;
     if (!state || typeof state !== 'object') {
       return res.status(400).json({ success: false, error: 'Invalid state payload' });
     }
-    saveUserState(userId, state);
+    await saveUserState(userId, state);
     res.json({ success: true, message: 'User state saved successfully', savedAt: new Date().toISOString() });
   } catch (error) {
     console.error('[API /api/user/sync Error]:', error);
@@ -89,10 +89,10 @@ app.post('/api/user/sync', (req, res) => {
 });
 
 // 4. Live Presence Heartbeat ("Who is Studying Live")
-app.post('/api/user/presence', (req, res) => {
+app.post('/api/user/presence', async (req, res) => {
   try {
     const { uid, presence } = req.body;
-    updateUserPresence(uid, presence);
+    await updateUserPresence(uid, presence);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -100,28 +100,28 @@ app.post('/api/user/presence', (req, res) => {
 });
 
 // Legacy single-user compatibility endpoints
-app.get('/api/data', (req, res) => {
+app.get('/api/data', async (req, res) => {
   try {
-    const data = getAppState(null);
+    const data = await getAppState(null);
     res.json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.post('/api/sync', (req, res) => {
+app.post('/api/sync', async (req, res) => {
   try {
     const state = req.body;
-    saveAppState(state);
+    await saveAppState(state);
     res.json({ success: true, message: 'Saved to database' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.post('/api/reset', (req, res) => {
+app.post('/api/reset', async (req, res) => {
   try {
-    resetDatabase(req.body);
+    await resetDatabase(req.body);
     res.json({ success: true, message: 'Database reset' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -133,9 +133,9 @@ app.post('/api/reset', (req, res) => {
 // =========================================================
 
 // 1. Live Studiers Now
-app.get('/api/community/live-users', (req, res) => {
+app.get('/api/community/live-users', async (req, res) => {
   try {
-    const liveUsers = getLiveStudyingUsers();
+    const liveUsers = await getLiveStudyingUsers();
     res.json({ success: true, liveUsers });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -143,9 +143,9 @@ app.get('/api/community/live-users', (req, res) => {
 });
 
 // 2. Multi-Category Leaderboard
-app.get('/api/community/leaderboard', (req, res) => {
+app.get('/api/community/leaderboard', async (req, res) => {
   try {
-    const leaderboard = getLeaderboard();
+    const leaderboard = await getLeaderboard();
     res.json({ success: true, leaderboard });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -153,9 +153,9 @@ app.get('/api/community/leaderboard', (req, res) => {
 });
 
 // 3. Announcements
-app.get('/api/community/announcements', (req, res) => {
+app.get('/api/community/announcements', async (req, res) => {
   try {
-    const announcements = getActiveAnnouncements();
+    const announcements = await getActiveAnnouncements();
     res.json({ success: true, announcements });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -167,9 +167,9 @@ app.get('/api/community/announcements', (req, res) => {
 // =========================================================
 
 // 1. Admin Telemetry Metrics
-app.get('/api/admin/metrics', (req, res) => {
+app.get('/api/admin/metrics', async (req, res) => {
   try {
-    const metrics = getAdminMetrics();
+    const metrics = await getAdminMetrics();
     res.json({ success: true, metrics });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -177,9 +177,9 @@ app.get('/api/admin/metrics', (req, res) => {
 });
 
 // 2. All Users Management Table
-app.get('/api/admin/users', (req, res) => {
+app.get('/api/admin/users', async (req, res) => {
   try {
-    const users = getAllUsers();
+    const users = await getAllUsers();
     res.json({ success: true, users });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -187,10 +187,10 @@ app.get('/api/admin/users', (req, res) => {
 });
 
 // 3. Change User Role (Admin <-> User)
-app.post('/api/admin/set-role', (req, res) => {
+app.post('/api/admin/set-role', async (req, res) => {
   try {
     const { uid, role } = req.body;
-    const user = setUserRole(uid, role);
+    const user = await setUserRole(uid, role);
     res.json({ success: true, user });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -198,10 +198,10 @@ app.post('/api/admin/set-role', (req, res) => {
 });
 
 // 4. Create Broadcast Announcement
-app.post('/api/admin/announcements', (req, res) => {
+app.post('/api/admin/announcements', async (req, res) => {
   try {
     const { message, type, createdBy } = req.body;
-    const announcements = createAnnouncement(message, type, createdBy);
+    const announcements = await createAnnouncement(message, type, createdBy);
     res.json({ success: true, announcements });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -209,10 +209,10 @@ app.post('/api/admin/announcements', (req, res) => {
 });
 
 // 5. Toggle Announcement Status
-app.post('/api/admin/toggle-announcement', (req, res) => {
+app.post('/api/admin/toggle-announcement', async (req, res) => {
   try {
     const { id, active } = req.body;
-    const announcements = toggleAnnouncement(id, active);
+    const announcements = await toggleAnnouncement(id, active);
     res.json({ success: true, announcements });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
