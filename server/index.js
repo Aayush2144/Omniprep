@@ -3,7 +3,24 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { initDatabase, getAppState, saveAppState, resetDatabase } from './db.js';
+import {
+  initDatabase,
+  getAppState,
+  saveAppState,
+  resetDatabase,
+  getUserState,
+  saveUserState,
+  registerOrUpdateUser,
+  getAllUsers,
+  setUserRole,
+  updateUserPresence,
+  getLiveStudyingUsers,
+  getLeaderboard,
+  getAdminMetrics,
+  getActiveAnnouncements,
+  createAnnouncement,
+  toggleAnnouncement
+} from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,27 +32,79 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// Initialize SQLite database
+// Initialize Multi-User SQLite database
 initDatabase();
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
-    database: 'SQLite (better-sqlite3)',
+    database: 'SQLite (Multi-User & Live Presence)',
     aiSupported: true,
     environment: process.env.NODE_ENV || 'production',
     timestamp: new Date().toISOString()
   });
 });
 
-// Database endpoints
+// =========================================================
+// MULTI-USER AUTH & STATE ENDPOINTS
+// =========================================================
+
+// 1. Register or Update User Profile
+app.post('/api/user/profile', (req, res) => {
+  try {
+    const user = registerOrUpdateUser(req.body);
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('[API /api/user/profile Error]:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 2. Fetch Isolated User State
+app.get('/api/user/data', (req, res) => {
+  try {
+    const { userId } = req.query;
+    const data = getUserState(userId, null);
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('[API /api/user/data Error]:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 3. Sync User State
+app.post('/api/user/sync', (req, res) => {
+  try {
+    const { userId, state } = req.body;
+    if (!state || typeof state !== 'object') {
+      return res.status(400).json({ success: false, error: 'Invalid state payload' });
+    }
+    saveUserState(userId, state);
+    res.json({ success: true, message: 'User state saved successfully', savedAt: new Date().toISOString() });
+  } catch (error) {
+    console.error('[API /api/user/sync Error]:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 4. Live Presence Heartbeat ("Who is Studying Live")
+app.post('/api/user/presence', (req, res) => {
+  try {
+    const { uid, presence } = req.body;
+    updateUserPresence(uid, presence);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Legacy single-user compatibility endpoints
 app.get('/api/data', (req, res) => {
   try {
     const data = getAppState(null);
     res.json({ success: true, data });
   } catch (error) {
-    console.error('[API] Error fetching data:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -43,24 +112,109 @@ app.get('/api/data', (req, res) => {
 app.post('/api/sync', (req, res) => {
   try {
     const state = req.body;
-    if (!state || typeof state !== 'object') {
-      return res.status(400).json({ success: false, error: 'Invalid state payload' });
-    }
     saveAppState(state);
-    res.json({ success: true, message: 'Saved to SQLite database successfully', savedAt: new Date().toISOString() });
+    res.json({ success: true, message: 'Saved to database' });
   } catch (error) {
-    console.error('[API] Error syncing data:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
 app.post('/api/reset', (req, res) => {
   try {
-    const zeroData = req.body;
-    resetDatabase(zeroData);
-    res.json({ success: true, message: 'Database reset to zero state' });
+    resetDatabase(req.body);
+    res.json({ success: true, message: 'Database reset' });
   } catch (error) {
-    console.error('[API] Error resetting database:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// =========================================================
+// COMMUNITY & LEADERBOARD ENDPOINTS
+// =========================================================
+
+// 1. Live Studiers Now
+app.get('/api/community/live-users', (req, res) => {
+  try {
+    const liveUsers = getLiveStudyingUsers();
+    res.json({ success: true, liveUsers });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 2. Multi-Category Leaderboard
+app.get('/api/community/leaderboard', (req, res) => {
+  try {
+    const leaderboard = getLeaderboard();
+    res.json({ success: true, leaderboard });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 3. Announcements
+app.get('/api/community/announcements', (req, res) => {
+  try {
+    const announcements = getActiveAnnouncements();
+    res.json({ success: true, announcements });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// =========================================================
+// ADMIN CONTROL & TELEMETRY ENDPOINTS
+// =========================================================
+
+// 1. Admin Telemetry Metrics
+app.get('/api/admin/metrics', (req, res) => {
+  try {
+    const metrics = getAdminMetrics();
+    res.json({ success: true, metrics });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 2. All Users Management Table
+app.get('/api/admin/users', (req, res) => {
+  try {
+    const users = getAllUsers();
+    res.json({ success: true, users });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 3. Change User Role (Admin <-> User)
+app.post('/api/admin/set-role', (req, res) => {
+  try {
+    const { uid, role } = req.body;
+    const user = setUserRole(uid, role);
+    res.json({ success: true, user });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 4. Create Broadcast Announcement
+app.post('/api/admin/announcements', (req, res) => {
+  try {
+    const { message, type, createdBy } = req.body;
+    const announcements = createAnnouncement(message, type, createdBy);
+    res.json({ success: true, announcements });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 5. Toggle Announcement Status
+app.post('/api/admin/toggle-announcement', (req, res) => {
+  try {
+    const { id, active } = req.body;
+    const announcements = toggleAnnouncement(id, active);
+    res.json({ success: true, announcements });
+  } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -70,13 +224,11 @@ app.post('/api/reset', (req, res) => {
 // =========================================================
 
 const DEFAULT_MODELS = [
-  'gemini-2.0-flash-001',
-  'gemini-1.5-flash-002',
-  'gemini-1.5-flash-001',
-  'gemini-2.5-flash',
+  'gemini-flash-latest',
   'gemini-2.0-flash',
+  'gemini-1.5-flash-002',
   'gemini-1.5-flash',
-  'gemini-1.5-flash-8b'
+  'gemini-2.5-flash'
 ];
 
 const keyModelCache = new Map();
@@ -99,7 +251,6 @@ async function getLiveModelsForApiKey(apiKey) {
           .map(m => m.name.replace(/^models\//, ''));
 
         if (supported.length > 0) {
-          // Sort Flash models first
           const sorted = supported.sort((a, b) => {
             const aFlash = a.includes('flash');
             const bFlash = b.includes('flash');
@@ -108,15 +259,12 @@ async function getLiveModelsForApiKey(apiKey) {
             return 0;
           });
 
-          console.log('[Gemini Discovery] Live models discovered for key:', sorted);
           keyModelCache.set(apiKey, { models: sorted, time: Date.now() });
           return sorted;
         }
       }
     }
-  } catch (e) {
-    console.warn('[Gemini Discovery] ListModels query failed:', e.message);
-  }
+  } catch (e) {}
 
   return DEFAULT_MODELS;
 }
@@ -192,14 +340,10 @@ async function executeGeminiWithFallback(apiKey, systemInstruction, promptText, 
   let lastError = null;
   for (const model of modelsToTry) {
     try {
-      console.log(`[Gemini REST] Invoking ${model}...`);
       const responseText = await callGoogleGeminiRest(cleanKey, model, systemInstruction, promptText, expectJson);
-      console.log(`[Gemini REST] Success with ${model}`);
       return { text: responseText, usedModel: model };
     } catch (err) {
       lastError = err;
-      console.warn(`[Gemini REST] ${model} failed:`, err.message);
-      // Try next model if 404, 429, or deprecated
       continue;
     }
   }
@@ -207,12 +351,11 @@ async function executeGeminiWithFallback(apiKey, systemInstruction, promptText, 
   throw lastError || new Error('Failed to communicate with Gemini API across all models.');
 }
 
-// 1. Generic Gemini Chat / Completion
+// 1. Generic Gemini Chat
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const { prompt, systemInstruction, apiKey, model } = req.body;
     const key = apiKey || process.env.GEMINI_API_KEY;
-
     const { text, usedModel } = await executeGeminiWithFallback(
       key,
       systemInstruction || 'You are an elite AI preparation coach for Data Science, GATE, and English Fluency.',
@@ -220,10 +363,8 @@ app.post('/api/ai/chat', async (req, res) => {
       model,
       false
     );
-
     res.json({ success: true, text, usedModel });
   } catch (error) {
-    console.error('[API /api/ai/chat Error]:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -234,27 +375,8 @@ app.post('/api/ai/interview', async (req, res) => {
     const { track, currentQuestion, userResponse, history, apiKey, model } = req.body;
     const key = apiKey || process.env.GEMINI_API_KEY;
 
-    const systemInstruction = `You are an expert Senior Technical Interviewer and Hiring Manager for top AI/Tech companies (Google, Amazon, DeepMind).
-Track: "${track || 'Data Science & Machine Learning'}".
-Evaluate the candidate's exact answer with high technical rigor.
-Respond strictly in JSON with this exact schema:
-{
-  "feedback": "Deep critique of the candidate's exact answer, identifying what was right and specifically what was missing or incorrect",
-  "scores": {
-    "technicalAccuracy": 8,
-    "depthAndClarity": 7,
-    "confidence": 8
-  },
-  "suggestedImprovement": "A polished, top-tier candidate phrasing for this exact question with math/code intuition",
-  "nextQuestion": "The next progressive technical interview question in this track"
-}`;
-
-    const promptText = `Track: ${track}
-Previous Question Asked: ${currentQuestion}
-Candidate's Spoken Answer: "${userResponse}"
-Conversation Context History: ${JSON.stringify(history || [])}
-
-Carefully evaluate what the candidate said: "${userResponse}". If they say they don't know, provide the concept explanation in suggestedImprovement, give fair scores, and ask the next question. Return valid JSON.`;
+    const systemInstruction = `You are a Senior Technical Interviewer for top AI/Tech companies. Track: "${track || 'Data Science & Machine Learning'}". Respond in strict JSON.`;
+    const promptText = `Track: ${track}\nQuestion: ${currentQuestion}\nCandidate: "${userResponse}"\nContext: ${JSON.stringify(history || [])}`;
 
     const { text, usedModel } = await executeGeminiWithFallback(
       key,
@@ -269,18 +391,16 @@ Carefully evaluate what the candidate said: "${userResponse}". If they say they 
       const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
       parsed = JSON.parse(cleaned);
     } catch (e) {
-      console.warn('[JSON Parse Warning] Raw response was not JSON:', text);
       parsed = {
         feedback: text,
-        scores: { technicalAccuracy: 7, depthAndClarity: 7, confidence: 7 },
-        suggestedImprovement: 'Review core mathematical and algorithmic definitions.',
-        nextQuestion: 'Can you describe how you validate models to prevent data leakage in production?'
+        scores: { technicalAccuracy: 8, depthAndClarity: 7, confidence: 8 },
+        suggestedImprovement: 'Explain mathematical formulation and production trade-offs.',
+        nextQuestion: 'Can you describe how you validate models to prevent data leakage?'
       };
     }
 
     res.json({ success: true, data: parsed, usedModel });
   } catch (error) {
-    console.error('[API /api/ai/interview Error]:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -291,29 +411,8 @@ app.post('/api/ai/english-coach', async (req, res) => {
     const { mode, topic, spokenTranscript, history, apiKey, model } = req.body;
     const key = apiKey || process.env.GEMINI_API_KEY;
 
-    const systemInstruction = `You are an elite native English Speaking Coach and Conversational Partner.
-Mode: "${mode || 'Conversational Dialogue'}".
-Topic: "${topic || 'General Discussion'}".
-You MUST evaluate the user's EXACT spoken words and reply naturally to what they actually said. DO NOT repeat canned greetings.
-
-Respond in strict JSON with this exact schema:
-{
-  "conversationalReply": "A natural, warm, conversational spoken English response that directly addresses what the user just said",
-  "grammarCorrections": [
-    { "original": "flawed phrase from user", "corrected": "natural phrase", "explanation": "why this correction helps" }
-  ],
-  "vocabularyUpgrades": [
-    { "simpleWord": "simple word user used", "upgrade": "sophisticated alternative", "example": "example sentence" }
-  ],
-  "fluencyRating": 4.5,
-  "feedbackTip": "One specific actionable tip regarding pronunciation, grammar, or word choice"
-}`;
-
-    const promptText = `Topic: ${topic}
-User's Spoken Utterance: "${spokenTranscript}"
-Previous Conversation History: ${JSON.stringify(history || [])}
-
-Evaluate what the user actually said ("${spokenTranscript}"). Respond naturally to their statement, point out any grammar issues if present (or leave empty if correct), suggest richer vocabulary, and keep the dialogue flowing! Return valid JSON.`;
+    const systemInstruction = `You are an elite native English Speaking Coach. Mode: "${mode}". Topic: "${topic}". Respond in strict JSON.`;
+    const promptText = `Topic: ${topic}\nUser Spoken: "${spokenTranscript}"\nContext: ${JSON.stringify(history || [])}`;
 
     const { text, usedModel } = await executeGeminiWithFallback(
       key,
@@ -339,7 +438,6 @@ Evaluate what the user actually said ("${spokenTranscript}"). Respond naturally 
 
     res.json({ success: true, data: parsed, usedModel });
   } catch (error) {
-    console.error('[API /api/ai/english-coach Error]:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -366,5 +464,5 @@ if (fs.existsSync(distPath)) {
 
 // Start listening
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 [Server] OmniPrep Production Server running on port ${PORT}`);
+  console.log(`🚀 [Server] OmniPrep Multi-User Production Server running on port ${PORT}`);
 });

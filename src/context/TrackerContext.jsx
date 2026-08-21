@@ -1,14 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { INITIAL_DATA } from '../data/initialData.js';
 import { soundEngine } from '../utils/audioSynth.js';
+import { useAuth } from './AuthContext.jsx';
 
 const TrackerContext = createContext(null);
-const LOCAL_STORAGE_KEY = 'omniprep_tracker_state_v3';
 
 export const TrackerProvider = ({ children }) => {
+  const { currentUser, sendPresenceHeartbeat } = useAuth();
+  const userId = currentUser?.uid || 'default-user';
+  const userStorageKey = `omniprep_state_${userId}`;
+
   const [data, setData] = useState(() => {
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const saved = localStorage.getItem(userStorageKey);
       if (saved) {
         return JSON.parse(saved);
       }
@@ -17,8 +21,8 @@ export const TrackerProvider = ({ children }) => {
   });
 
   const [dbStatus, setDbStatus] = useState('connecting'); // 'connecting' | 'connected' | 'saving' | 'offline'
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [analyticsCategory, setAnalyticsCategory] = useState('overall'); // 'overall' | 'gate' | 'academic' | 'job' | 'english'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'gate' | 'academic' | 'job' | 'english' | 'analytics' | 'community' | 'admin'
+  const [analyticsCategory, setAnalyticsCategory] = useState('overall');
   
   // Global Focus Timer State
   const [timerState, setTimerState] = useState({
@@ -34,45 +38,48 @@ export const TrackerProvider = ({ children }) => {
 
   const syncTimeoutRef = useRef(null);
 
-  // 1. Initial Load: Fetch from SQLite Backend Database
+  // 1. Initial Load when User changes: Fetch isolated state from backend
   useEffect(() => {
-    const fetchFromDb = async () => {
+    const fetchUserData = async () => {
       try {
         setDbStatus('connecting');
-        const res = await fetch('/api/data');
+        const res = await fetch(`/api/user/data?userId=${userId}`);
         if (res.ok) {
           const json = await res.json();
           if (json && json.success && json.data) {
             setData(json.data);
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(json.data));
+            localStorage.setItem(userStorageKey, JSON.stringify(json.data));
             setDbStatus('connected');
             return;
           }
         }
       } catch (err) {
-        console.warn('[Database] API server offline, using local storage cache:', err);
+        console.warn('[Database] User state fetch fallback to cache:', err);
       }
       setDbStatus('offline');
     };
 
-    fetchFromDb();
-  }, []);
+    fetchUserData();
+  }, [userId, userStorageKey]);
 
-  // 2. Real-time Persistence: Save to LocalStorage + Sync to SQLite Backend Database
+  // 2. Real-time Multi-Tenant Sync: Save to LocalStorage + Sync to SQLite Backend Database
   useEffect(() => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(userStorageKey, JSON.stringify(data));
     } catch (e) {}
 
-    // Debounce sync to backend database (500ms)
+    // Debounce sync to backend database (400ms)
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     syncTimeoutRef.current = setTimeout(async () => {
       try {
         setDbStatus('saving');
-        const res = await fetch('/api/sync', {
+        const res = await fetch('/api/user/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
+          body: JSON.stringify({
+            userId,
+            state: data
+          })
         });
         if (res.ok) {
           setDbStatus('connected');
@@ -87,7 +94,33 @@ export const TrackerProvider = ({ children }) => {
     return () => {
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     };
-  }, [data]);
+  }, [data, userId, userStorageKey]);
+
+  // 3. Heartbeat for "Who is Studying Live" Presence
+  useEffect(() => {
+    sendPresenceHeartbeat({
+      isStudying: timerState.isRunning,
+      category: timerState.category,
+      task: timerState.sessionNotes || `${timerState.category.toUpperCase()} Focus Session`,
+      remainingSec: timerState.remainingSec
+    });
+
+    // Send ongoing heartbeat every 45 seconds if studying
+    let interval = null;
+    if (timerState.isRunning) {
+      interval = setInterval(() => {
+        sendPresenceHeartbeat({
+          isStudying: true,
+          category: timerState.category,
+          task: timerState.sessionNotes || `${timerState.category.toUpperCase()} Focus Session`,
+          remainingSec: timerState.remainingSec
+        });
+      }, 45000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [timerState.isRunning, timerState.category, timerState.sessionNotes, timerState.remainingSec, sendPresenceHeartbeat]);
 
   // Global Timer Interval Tick
   useEffect(() => {
@@ -477,16 +510,15 @@ export const TrackerProvider = ({ children }) => {
     }));
   };
 
-  // Reset to Clean Zero State (both in memory and database)
   const resetToZeroData = async () => {
-    if (window.confirm('Reset all analytics and routine logs to ZERO fresh state?')) {
+    if (window.confirm('Reset all analytics and routine logs to ZERO fresh state for your account?')) {
       setData(INITIAL_DATA);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(INITIAL_DATA));
+      localStorage.setItem(userStorageKey, JSON.stringify(INITIAL_DATA));
       try {
-        await fetch('/api/reset', {
+        await fetch('/api/user/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(INITIAL_DATA)
+          body: JSON.stringify({ userId, state: INITIAL_DATA })
         });
       } catch (e) {}
     }
@@ -498,7 +530,7 @@ export const TrackerProvider = ({ children }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `omniprep_database_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `omniprep_backup_${currentUser?.displayName?.replace(/\s+/g, '_') || 'user'}_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -508,13 +540,13 @@ export const TrackerProvider = ({ children }) => {
     reader.onload = async (e) => {
       try {
         const imported = JSON.parse(e.target.result);
-        if (imported && imported.profile) {
+        if (imported && (imported.profile || imported.gate)) {
           setData(imported);
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(imported));
-          await fetch('/api/sync', {
+          localStorage.setItem(userStorageKey, JSON.stringify(imported));
+          await fetch('/api/user/sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(imported)
+            body: JSON.stringify({ userId, state: imported })
           });
           alert('Database restored successfully from backup!');
         } else {

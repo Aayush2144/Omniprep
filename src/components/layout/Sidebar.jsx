@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTracker } from '../../context/TrackerContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard,
   Cpu,
@@ -10,11 +11,15 @@ import {
   Calendar,
   Layers,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Trophy,
+  Users,
+  Shield
 } from 'lucide-react';
 
 export const Sidebar = () => {
   const { activeTab, setActiveTab, data } = useTracker();
+  const { isAdmin } = useAuth();
 
   // Compute countdown to GATE Exam
   const getDaysRemaining = (targetDateStr) => {
@@ -42,6 +47,16 @@ export const Sidebar = () => {
       activeBg: 'bg-indigo-600/15 border-indigo-500/40 text-indigo-300'
     },
     {
+      id: 'community',
+      label: 'Community & Live Hall',
+      icon: Trophy,
+      desc: 'Live studiers & Leaderboards',
+      badge: 'Live 🟢',
+      badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+      color: 'text-emerald-400',
+      activeBg: 'bg-emerald-600/15 border-emerald-500/40 text-emerald-300 shadow-glow-academic'
+    },
+    {
       id: 'gate',
       label: 'GATE DS & AI Hub',
       icon: Cpu,
@@ -57,9 +72,9 @@ export const Sidebar = () => {
       icon: GraduationCap,
       desc: 'Semester, GPA & Labs',
       badge: pendingAssignments > 0 ? `${pendingAssignments} Due` : null,
-      badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-      color: 'text-emerald-400',
-      activeBg: 'bg-emerald-600/15 border-emerald-500/40 text-emerald-300 shadow-glow-academic'
+      badgeColor: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+      color: 'text-sky-400',
+      activeBg: 'bg-sky-600/15 border-sky-500/40 text-sky-300 shadow-glow-academic'
     },
     {
       id: 'job',
@@ -90,82 +105,121 @@ export const Sidebar = () => {
       badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
       color: 'text-cyan-400',
       activeBg: 'bg-cyan-600/15 border-cyan-500/40 text-cyan-300'
-    },
+    }
   ];
 
+  // If Admin, include Admin Console
+  if (isAdmin) {
+    navItems.push({
+      id: 'admin',
+      label: 'Admin Console 👑',
+      icon: Shield,
+      desc: 'Users, Telemetry & Broadcasts',
+      badge: 'Admin',
+      badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+      color: 'text-purple-400',
+      activeBg: 'bg-purple-600/20 border-purple-500/50 text-purple-200'
+    });
+  }
+
   return (
-    <aside className="w-full lg:w-64 bg-[#0c121e]/90 border-r border-white/5 flex flex-col justify-between p-4 shrink-0">
-      {/* Brand & Logo */}
-      <div>
-        <div className="flex items-center space-x-3 px-3 py-3 mb-6 bg-slate-900/60 rounded-xl border border-white/5">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 via-purple-600 to-rose-500 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-            <Layers className="w-5 h-5 text-white" />
+    <aside className="w-64 lg:w-72 bg-[#060911] border-r border-white/5 flex flex-col justify-between p-4 shrink-0 select-none min-h-screen">
+      {/* Brand Header */}
+      <div className="space-y-6">
+        <div className="flex items-center space-x-3 px-2 pt-2">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 p-0.5 shadow-lg shadow-indigo-600/20 flex items-center justify-center">
+            <div className="w-full h-full bg-[#090d16] rounded-[14px] flex items-center justify-center">
+              <Layers className="w-5 h-5 text-indigo-400 animate-pulse" />
+            </div>
           </div>
           <div>
-            <h1 className="font-bold text-sm text-white tracking-wide flex items-center gap-1.5">
-              OmniPrep <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">PRO</span>
-            </h1>
-            <p className="text-[11px] text-slate-400">Mastery Routine Suite</p>
+            <div className="flex items-center space-x-1.5">
+              <span className="font-extrabold text-lg text-white tracking-tight">OmniPrep</span>
+              <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
+                Multi-User
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 font-medium">Routine & Mastery Suite</p>
           </div>
         </div>
 
-        {/* Navigation items */}
-        <div className="space-y-1.5">
-          <div className="px-3 py-1 text-[10px] uppercase tracking-wider font-semibold text-slate-400">
-            Preparation Pillars
-          </div>
+        {/* Navigation List */}
+        <nav className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
+
             return (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs font-medium transition-all group ${
+                className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all duration-200 group text-left ${
                   isActive
-                    ? `${item.activeBg} border`
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+                    ? `${item.activeBg} shadow-sm font-semibold`
+                    : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
                 }`}
               >
-                <div className="flex items-center space-x-3">
-                  <Icon className={`w-4 h-4 transition-transform group-hover:scale-110 ${isActive ? item.color : 'text-slate-400'}`} />
-                  <div>
-                    <div className={isActive ? 'text-white font-semibold' : 'text-slate-300'}>{item.label}</div>
-                    <div className="text-[10px] text-slate-400 line-clamp-1">{item.desc}</div>
+                <div className="flex items-center space-x-3 overflow-hidden">
+                  <div className={`p-2 rounded-xl transition ${isActive ? 'bg-white/10 text-white' : 'bg-slate-900 text-slate-400 group-hover:text-slate-200'}`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="truncate">
+                    <div className={`text-xs font-semibold ${isActive ? 'text-white' : 'text-slate-300'}`}>
+                      {item.label}
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate font-normal">
+                      {item.desc}
+                    </div>
                   </div>
                 </div>
+
                 {item.badge && (
-                  <span className={`text-[10px] px-2 py-0.5 rounded-md font-mono font-medium border ${item.badgeColor}`}>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-medium border shrink-0 ${item.badgeColor}`}>
                     {item.badge}
                   </span>
                 )}
               </button>
             );
           })}
-        </div>
+        </nav>
       </div>
 
-      {/* Bottom Milestones & Target Countdown */}
-      <div className="mt-6 pt-4 border-t border-white/5 space-y-3">
-        <div className="bg-slate-900/80 border border-white/5 p-3 rounded-xl">
-          <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-            <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-indigo-400" /> GATE DS Exam</span>
-            <span className="font-mono text-indigo-400 font-semibold">{daysToGate}d left</span>
+      {/* Target Exam Countdown Widgets */}
+      <div className="space-y-3 pt-6 border-t border-white/5">
+        <div className="glass-panel p-3.5 rounded-2xl border border-indigo-500/15 bg-gradient-to-br from-indigo-950/20 to-slate-900/40 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-400 font-medium flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+              GATE DA 2027
+            </span>
+            <span className="text-indigo-400 font-mono font-bold text-xs">{daysToGate} Days</span>
           </div>
-          <div className="flex items-center justify-between text-[11px] text-slate-400">
-            <span className="flex items-center gap-1"><Sparkles className="w-3.5 h-3.5 text-amber-400" /> Interview Sprint</span>
-            <span className="font-mono text-amber-400 font-semibold">{daysToInterview}d left</span>
-          </div>
+          <div className="text-[11px] text-slate-400">Target Date: Feb 6, 2027</div>
         </div>
 
-        {/* Profile Card */}
-        <div className="flex items-center space-x-3 px-2 py-1">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-emerald-400 flex items-center justify-center font-bold text-xs text-white shadow-md">
-            {data.profile?.name ? data.profile.name.charAt(0) : 'A'}
+        <div className="glass-panel p-3.5 rounded-2xl border border-amber-500/15 bg-gradient-to-br from-amber-950/20 to-slate-900/40 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-400 font-medium flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              Job Interview Sprint
+            </span>
+            <span className="text-amber-400 font-mono font-bold text-xs">{daysToInterview} Days</span>
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="text-[11px] text-slate-400">Target Date: Oct 15, 2026</div>
+        </div>
+
+        {/* User Card */}
+        <div className="p-2.5 rounded-2xl bg-slate-950/80 border border-white/5 flex items-center space-x-3">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 p-0.5">
+            <img
+              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${data.profile?.name || 'Aayush'}`}
+              alt="Avatar"
+              className="w-full h-full rounded-full bg-slate-900 object-cover"
+            />
+          </div>
+          <div className="overflow-hidden">
             <div className="text-xs font-semibold text-white truncate">{data.profile?.name || 'Aayush Kumar'}</div>
-            <div className="text-[10px] text-slate-400 truncate">Target: {data.profile?.targetRole || 'Data Scientist'}</div>
+            <div className="text-[10px] text-slate-500 truncate">{data.profile?.targetRole || 'Data Scientist'}</div>
           </div>
         </div>
       </div>

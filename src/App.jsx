@@ -1,15 +1,19 @@
 import React, { Component } from 'react';
+import { AuthProvider } from './context/AuthContext';
 import { TrackerProvider, useTracker } from './context/TrackerContext';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { QuickTimerBar } from './components/layout/QuickTimerBar';
 import { FocusTimerModal } from './components/timer/FocusTimerModal';
+import { AuthModal } from './components/auth/AuthModal';
 import { OverviewDashboard } from './components/dashboard/OverviewDashboard';
 import { GateDashboard } from './components/gate/GateDashboard';
 import { AcademicDashboard } from './components/academic/AcademicDashboard';
 import { JobDashboard } from './components/job/JobDashboard';
 import { EnglishDashboard } from './components/english/EnglishDashboard';
 import { MasterAnalytics } from './components/analytics/MasterAnalytics';
+import { CommunityHub } from './components/community/CommunityHub';
+import { AdminDashboard } from './components/admin/AdminDashboard';
 import { AlertCircle, RotateCcw } from 'lucide-react';
 
 class ErrorBoundary extends Component {
@@ -68,17 +72,20 @@ const AppContent = () => {
         
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto pb-24">
           {activeTab === 'dashboard' && <OverviewDashboard />}
+          {activeTab === 'community' && <CommunityHub />}
           {activeTab === 'gate' && <GateDashboard />}
           {activeTab === 'academic' && <AcademicDashboard />}
           {activeTab === 'job' && <JobDashboard />}
           {activeTab === 'english' && <EnglishDashboard />}
           {activeTab === 'analytics' && <MasterAnalytics />}
+          {activeTab === 'admin' && <AdminDashboard />}
         </main>
       </div>
 
-      {/* Persistent Global Focus Timer Components */}
+      {/* Persistent Global Focus Timer & Auth Modal */}
       <FocusTimerModal />
       <QuickTimerBar />
+      <AuthModal />
     </div>
   );
 };
@@ -86,9 +93,11 @@ const AppContent = () => {
 export default function App() {
   return (
     <ErrorBoundary>
-      <TrackerProvider>
-        <AppContent />
-      </TrackerProvider>
+      <AuthProvider>
+        <TrackerProvider>
+          <AppContent />
+        </TrackerProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
