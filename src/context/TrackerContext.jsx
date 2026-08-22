@@ -24,14 +24,21 @@ export const TrackerProvider = ({ children }) => {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'gate' | 'academic' | 'job' | 'english' | 'analytics' | 'community' | 'admin'
   const [analyticsCategory, setAnalyticsCategory] = useState('overall');
   
-  // Global Focus Timer State
+  // Global Focus & Pomodoro Timer State
   const [timerState, setTimerState] = useState({
     isOpen: false,
     isRunning: false,
     category: 'gate',
+    mode: 'focus', // 'focus' | 'shortBreak' | 'longBreak'
+    focusDurationMin: 25,
+    breakDurationMin: 5,
+    longBreakDurationMin: 15,
+    cyclesBeforeLongBreak: 4,
+    currentCycle: 1,
     durationSec: 25 * 60,
     remainingSec: 25 * 60,
-    mode: 'pomodoro',
+    autoStartBreaks: false,
+    autoStartFocus: false,
     ambientSound: 'off',
     sessionNotes: ''
   });
@@ -131,13 +138,38 @@ export const TrackerProvider = ({ children }) => {
           if (prev.remainingSec <= 1) {
             soundEngine.playCompletionChime();
             soundEngine.stopAmbient();
-            logFocusSession(prev.category, prev.durationSec / 3600);
-            return {
-              ...prev,
-              isRunning: false,
-              remainingSec: 0,
-              ambientSound: 'off'
-            };
+
+            if (prev.mode === 'focus') {
+              // Log the completed focus session
+              logFocusSession(prev.category, prev.durationSec / 3600);
+
+              // Determine next break (Short Break vs Long Break)
+              const isLongBreak = (prev.currentCycle || 1) >= (prev.cyclesBeforeLongBreak || 4);
+              const nextMode = isLongBreak ? 'longBreak' : 'shortBreak';
+              const nextDurationSec = (isLongBreak ? (prev.longBreakDurationMin || 15) : (prev.breakDurationMin || 5)) * 60;
+              const nextCycle = isLongBreak ? 1 : ((prev.currentCycle || 1) + 1);
+
+              return {
+                ...prev,
+                mode: nextMode,
+                durationSec: nextDurationSec,
+                remainingSec: nextDurationSec,
+                currentCycle: nextCycle,
+                isRunning: Boolean(prev.autoStartBreaks),
+                ambientSound: 'off'
+              };
+            } else {
+              // Break finished! Return to focus session
+              const nextDurationSec = (prev.focusDurationMin || 25) * 60;
+              return {
+                ...prev,
+                mode: 'focus',
+                durationSec: nextDurationSec,
+                remainingSec: nextDurationSec,
+                isRunning: Boolean(prev.autoStartFocus),
+                ambientSound: 'off'
+              };
+            }
           }
           return { ...prev, remainingSec: prev.remainingSec - 1 };
         });
