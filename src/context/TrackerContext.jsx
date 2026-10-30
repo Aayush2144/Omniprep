@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { INITIAL_DATA } from '../data/initialData.js';
 import { soundEngine } from '../utils/audioSynth.js';
 import { useAuth } from './AuthContext.jsx';
+import { pipOverlay } from '../utils/pipOverlay.js';
 
 const TrackerContext = createContext(null);
 
@@ -25,22 +26,45 @@ export const TrackerProvider = ({ children }) => {
   const [analyticsCategory, setAnalyticsCategory] = useState('overall');
   
   // Global Focus & Pomodoro Timer State
-  const [timerState, setTimerState] = useState({
-    isOpen: false,
-    isRunning: false,
-    category: 'gate',
-    mode: 'focus', // 'focus' | 'shortBreak' | 'longBreak'
-    focusDurationMin: 25,
-    breakDurationMin: 5,
-    longBreakDurationMin: 15,
-    cyclesBeforeLongBreak: 4,
-    currentCycle: 1,
-    durationSec: 25 * 60,
-    remainingSec: 25 * 60,
-    autoStartBreaks: false,
-    autoStartFocus: false,
-    ambientSound: 'off',
-    sessionNotes: ''
+  const [timerState, setTimerState] = useState(() => {
+    // Attempt to recover running timer if browser crashed/closed
+    const defaultTimer = {
+      isOpen: false,
+      isRunning: false,
+      category: 'gate',
+      mode: 'focus', // 'focus' | 'shortBreak' | 'longBreak'
+      focusDurationMin: 25,
+      breakDurationMin: 5,
+      longBreakDurationMin: 15,
+      cyclesBeforeLongBreak: 4,
+      currentCycle: 1,
+      durationSec: 25 * 60,
+      remainingSec: 25 * 60,
+      targetEndTime: null, // Wall-clock timestamp for background tab preservation
+      autoStartBreaks: false,
+      autoStartFocus: false,
+      ambientSound: 'off',
+      sessionNotes: '',
+      isPipActive: false,
+    };
+
+    try {
+      const savedTimer = localStorage.getItem('omniprep_active_timer_state');
+      if (savedTimer) {
+        const parsed = JSON.parse(savedTimer);
+        if (parsed.isRunning && parsed.targetEndTime) {
+          const now = Date.now();
+          const leftSec = Math.max(0, Math.round((parsed.targetEndTime - now) / 1000));
+          return {
+            ...parsed,
+            remainingSec: leftSec,
+            isRunning: leftSec > 0,
+          };
+        }
+        return { ...parsed, isRunning: false };
+      }
+    } catch (_) {}
+    return defaultTimer;
   });
 
   const syncTimeoutRef = useRef(null);
@@ -129,21 +153,94 @@ export const TrackerProvider = ({ children }) => {
     };
   }, [timerState.isRunning, timerState.category, timerState.sessionNotes, timerState.remainingSec, sendPresenceHeartbeat]);
 
-  // Global Timer Interval Tick
+  // Persist timer state to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('omniprep_active_timer_state', JSON.stringify(timerState));
+    } catch (_) {}
+    // Update PiP Canvas frame if active
+    if (timerState.isPipActive) {
+      pipOverlay.update(timerState);
+    }
+  }, [timerState]);
+
+  // Document Visibility Change Handler: Immediately catch-up timer when returning to tab
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && timerState.isRunning && timerState.targetEndTime) {
+        const now = Date.now();
+        const leftSec = Math.max(0, Math.round((timerState.targetEndTime - now) / 1000));
+        setTimerState(prev => {
+          if (leftSec <= 0) {
+            // Timer expired while user was in another tab
+            soundEngine.playCompletionChime();
+            soundEngine.stopAmbient();
+            if (prev.mode === 'focus') {
+              logFocusSession(prev.category, prev.durationSec / 3600);
+              const isLongBreak = (prev.currentCycle || 1) >= (prev.cyclesBeforeLongBreak || 4);
+              const nextMode = isLongBreak ? 'longBreak' : 'shortBreak';
+              const nextDurationSec = (isLongBreak ? (prev.longBreakDurationMin || 15) : (prev.breakDurationMin || 5)) * 60;
+              const nextCycle = isLongBreak ? 1 : ((prev.currentCycle || 1) + 1);
+              return {
+                ...prev,
+                mode: nextMode,
+                durationSec: nextDurationSec,
+                remainingSec: nextDurationSec,
+                targetEndTime: prev.autoStartBreaks ? Date.now() + nextDurationSec * 1000 : null,
+                currentCycle: nextCycle,
+                isRunning: Boolean(prev.autoStartBreaks),
+                ambientSound: 'off'
+              };
+            } else {
+              const nextDurationSec = (prev.focusDurationMin || 25) * 60;
+              return {
+                ...prev,
+                mode: 'focus',
+                durationSec: nextDurationSec,
+                remainingSec: nextDurationSec,
+                targetEndTime: prev.autoStartFocus ? Date.now() + nextDurationSec * 1000 : null,
+                isRunning: Boolean(prev.autoStartFocus),
+                ambientSound: 'off'
+              };
+            }
+          }
+          return { ...prev, remainingSec: leftSec };
+        });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
+  }, [timerState.isRunning, timerState.targetEndTime]);
+
+  // Global Timer Interval Tick (Synchronized to Date.now() wall-clock)
   useEffect(() => {
     let interval = null;
-    if (timerState.isRunning && timerState.remainingSec > 0) {
+    if (timerState.isRunning) {
       interval = setInterval(() => {
         setTimerState(prev => {
-          if (prev.remainingSec <= 1) {
+          if (!prev.isRunning) return prev;
+
+          // Compute exact remaining seconds based on wall-clock targetEndTime
+          let currentRemaining = prev.remainingSec;
+          if (prev.targetEndTime) {
+            const now = Date.now();
+            currentRemaining = Math.max(0, Math.round((prev.targetEndTime - now) / 1000));
+          } else {
+            currentRemaining = Math.max(0, prev.remainingSec - 1);
+          }
+
+          if (currentRemaining <= 0) {
             soundEngine.playCompletionChime();
             soundEngine.stopAmbient();
 
             if (prev.mode === 'focus') {
-              // Log the completed focus session
               logFocusSession(prev.category, prev.durationSec / 3600);
 
-              // Determine next break (Short Break vs Long Break)
               const isLongBreak = (prev.currentCycle || 1) >= (prev.cyclesBeforeLongBreak || 4);
               const nextMode = isLongBreak ? 'longBreak' : 'shortBreak';
               const nextDurationSec = (isLongBreak ? (prev.longBreakDurationMin || 15) : (prev.breakDurationMin || 5)) * 60;
@@ -154,31 +251,32 @@ export const TrackerProvider = ({ children }) => {
                 mode: nextMode,
                 durationSec: nextDurationSec,
                 remainingSec: nextDurationSec,
+                targetEndTime: prev.autoStartBreaks ? Date.now() + nextDurationSec * 1000 : null,
                 currentCycle: nextCycle,
                 isRunning: Boolean(prev.autoStartBreaks),
                 ambientSound: 'off'
               };
             } else {
-              // Break finished! Return to focus session
               const nextDurationSec = (prev.focusDurationMin || 25) * 60;
               return {
                 ...prev,
                 mode: 'focus',
                 durationSec: nextDurationSec,
                 remainingSec: nextDurationSec,
+                targetEndTime: prev.autoStartFocus ? Date.now() + nextDurationSec * 1000 : null,
                 isRunning: Boolean(prev.autoStartFocus),
                 ambientSound: 'off'
               };
             }
           }
-          return { ...prev, remainingSec: prev.remainingSec - 1 };
+          return { ...prev, remainingSec: currentRemaining };
         });
-      }, 1000);
+      }, 500); // 500ms for extra precision
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [timerState.isRunning, timerState.remainingSec]);
+  }, [timerState.isRunning]);
 
   // Handler: Log completed focus session into today's activity log
   const logFocusSession = (category, hours) => {

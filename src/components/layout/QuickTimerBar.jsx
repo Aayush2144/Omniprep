@@ -1,7 +1,8 @@
 import React from 'react';
 import { useTracker } from '../../context/TrackerContext';
-import { Play, Pause, Square, Maximize2, Sparkles, Coffee, Flame, SkipForward } from 'lucide-react';
+import { Play, Pause, Square, Maximize2, Sparkles, Coffee, Flame, SkipForward, PictureInPicture2 } from 'lucide-react';
 import { soundEngine } from '../../utils/audioSynth';
+import { pipOverlay } from '../../utils/pipOverlay';
 
 export const QuickTimerBar = () => {
   const { timerState, setTimerState } = useTracker();
@@ -45,7 +46,11 @@ export const QuickTimerBar = () => {
       } else if (prev.ambientSound !== 'off') {
         soundEngine.startAmbient(prev.ambientSound);
       }
-      return { ...prev, isRunning: nextRunning };
+      return {
+        ...prev,
+        isRunning: nextRunning,
+        targetEndTime: nextRunning ? Date.now() + prev.remainingSec * 1000 : null
+      };
     });
   };
 
@@ -87,6 +92,22 @@ export const QuickTimerBar = () => {
         };
       }
     });
+  };
+
+  const togglePip = async () => {
+    try {
+      if (timerState.isPipActive) {
+        await pipOverlay.stop();
+        setTimerState(prev => ({ ...prev, isPipActive: false }));
+      } else {
+        await pipOverlay.start(timerState, () => {
+          setTimerState(prev => ({ ...prev, isPipActive: false }));
+        });
+        setTimerState(prev => ({ ...prev, isPipActive: true }));
+      }
+    } catch (e) {
+      console.warn('PiP error:', e);
+    }
   };
 
   return (
@@ -134,6 +155,14 @@ export const QuickTimerBar = () => {
             title="Reset"
           >
             <Square className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            onClick={togglePip}
+            className={`p-1.5 rounded-lg text-white transition ${timerState.isPipActive ? 'bg-purple-600' : 'hover:bg-white/20'}`}
+            title={timerState.isPipActive ? 'Close Screen Overlay' : 'Open Screen Overlay (floats above all apps)'}
+          >
+            <PictureInPicture2 className="w-3.5 h-3.5" />
           </button>
 
           <button

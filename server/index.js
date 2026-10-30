@@ -422,6 +422,54 @@ app.post('/api/ai/interview', async (req, res) => {
   }
 });
 
+// ── Claude Proxy (Anthropic API — CORS-restricted in browser) ─────────────
+app.post('/api/ai/claude-proxy', async (req, res) => {
+  try {
+    const { apiKey, model, systemInstruction, promptText } = req.body;
+    const key = (apiKey || process.env.CLAUDE_API_KEY || '').trim();
+    if (!key) {
+      return res.status(400).json({ success: false, error: 'No Claude API key provided.' });
+    }
+
+    const cleanModel = (model || 'claude-3-5-haiku-20241022').trim();
+
+    const messages = [{ role: 'user', content: promptText }];
+
+    const payload = {
+      model: cleanModel,
+      max_tokens: 2048,
+      messages,
+    };
+    if (systemInstruction) payload.system = systemInstruction;
+
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!claudeRes.ok) {
+      const errBody = await claudeRes.text();
+      let msg = errBody;
+      try { msg = JSON.parse(errBody).error?.message || errBody; } catch (_) {}
+      return res.status(claudeRes.status).json({ success: false, error: `[Claude ${claudeRes.status}] ${msg}` });
+    }
+
+    const json = await claudeRes.json();
+    const text = json.content?.[0]?.text;
+    if (!text) return res.status(502).json({ success: false, error: 'Empty response from Claude.' });
+
+    res.json({ success: true, text, usedModel: cleanModel });
+  } catch (error) {
+    console.error('[Claude Proxy Error]:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 3. AI English Speaking & Pronunciation Coach
 app.post('/api/ai/english-coach', async (req, res) => {
   try {

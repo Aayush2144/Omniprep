@@ -11,6 +11,7 @@ import { GateDashboard } from './components/gate/GateDashboard';
 import { AcademicDashboard } from './components/academic/AcademicDashboard';
 import { JobDashboard } from './components/job/JobDashboard';
 import { EnglishDashboard } from './components/english/EnglishDashboard';
+import { AiInterviewMeetingStudio } from './components/interview/AiInterviewMeetingStudio';
 import { MasterAnalytics } from './components/analytics/MasterAnalytics';
 import { CommunityHub } from './components/community/CommunityHub';
 import { AdminDashboard } from './components/admin/AdminDashboard';
@@ -76,6 +77,7 @@ const AppContent = () => {
           {activeTab === 'community' && <CommunityHub />}
           {activeTab === 'gate' && <GateDashboard />}
           {activeTab === 'academic' && <AcademicDashboard />}
+          {activeTab === 'interview' && <AiInterviewMeetingStudio />}
           {activeTab === 'job' && <JobDashboard />}
           {activeTab === 'english' && <EnglishDashboard />}
           {activeTab === 'analytics' && <MasterAnalytics />}

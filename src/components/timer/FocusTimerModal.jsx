@@ -23,13 +23,36 @@ import {
   Settings2,
   Sliders,
   Check,
-  Zap
+  Zap,
+  PictureInPicture2,
+  ExternalLink
 } from 'lucide-react';
 import { soundEngine } from '../../utils/audioSynth';
+import { pipOverlay } from '../../utils/pipOverlay';
 
 export const FocusTimerModal = () => {
   const { timerState, setTimerState, logFocusSession } = useTracker();
   const [showSettings, setShowSettings] = useState(false);
+  const [pipError, setPipError] = useState('');
+
+  // Toggle Picture-in-Picture Floating Overlay
+  const togglePipOverlay = async () => {
+    setPipError('');
+    try {
+      if (timerState.isPipActive) {
+        await pipOverlay.stop();
+        setTimerState(prev => ({ ...prev, isPipActive: false }));
+      } else {
+        await pipOverlay.start(timerState, () => {
+          setTimerState(prev => ({ ...prev, isPipActive: false }));
+        });
+        setTimerState(prev => ({ ...prev, isPipActive: true }));
+      }
+    } catch (err) {
+      console.warn('PiP Overlay Error:', err);
+      setPipError(err.message || 'Picture-in-Picture could not be started in this browser.');
+    }
+  };
 
   if (!timerState.isOpen) return null;
 
@@ -79,6 +102,7 @@ export const FocusTimerModal = () => {
       mode,
       durationSec: sec,
       remainingSec: sec,
+      targetEndTime: null,
       isRunning: false
     }));
   };
@@ -89,11 +113,13 @@ export const FocusTimerModal = () => {
     const clamped = Math.max(1, Math.min(180, mins));
     setTimerState(prev => {
       const isCurrent = prev.mode === 'focus';
+      const sec = clamped * 60;
       return {
         ...prev,
         focusDurationMin: clamped,
-        durationSec: isCurrent ? clamped * 60 : prev.durationSec,
-        remainingSec: isCurrent ? clamped * 60 : prev.remainingSec,
+        durationSec: isCurrent ? sec : prev.durationSec,
+        remainingSec: isCurrent ? sec : prev.remainingSec,
+        targetEndTime: isCurrent && prev.isRunning ? Date.now() + sec * 1000 : null,
         isRunning: isCurrent ? false : prev.isRunning
       };
     });
@@ -105,11 +131,13 @@ export const FocusTimerModal = () => {
     const clamped = Math.max(1, Math.min(60, mins));
     setTimerState(prev => {
       const isCurrent = prev.mode === 'shortBreak';
+      const sec = clamped * 60;
       return {
         ...prev,
         breakDurationMin: clamped,
-        durationSec: isCurrent ? clamped * 60 : prev.durationSec,
-        remainingSec: isCurrent ? clamped * 60 : prev.remainingSec,
+        durationSec: isCurrent ? sec : prev.durationSec,
+        remainingSec: isCurrent ? sec : prev.remainingSec,
+        targetEndTime: isCurrent && prev.isRunning ? Date.now() + sec * 1000 : null,
         isRunning: isCurrent ? false : prev.isRunning
       };
     });
@@ -121,11 +149,13 @@ export const FocusTimerModal = () => {
     const clamped = Math.max(5, Math.min(90, mins));
     setTimerState(prev => {
       const isCurrent = prev.mode === 'longBreak';
+      const sec = clamped * 60;
       return {
         ...prev,
         longBreakDurationMin: clamped,
-        durationSec: isCurrent ? clamped * 60 : prev.durationSec,
-        remainingSec: isCurrent ? clamped * 60 : prev.remainingSec,
+        durationSec: isCurrent ? sec : prev.durationSec,
+        remainingSec: isCurrent ? sec : prev.remainingSec,
+        targetEndTime: isCurrent && prev.isRunning ? Date.now() + sec * 1000 : null,
         isRunning: isCurrent ? false : prev.isRunning
       };
     });
@@ -141,7 +171,11 @@ export const FocusTimerModal = () => {
       } else if (!next) {
         soundEngine.stopAmbient();
       }
-      return { ...prev, isRunning: next };
+      return {
+        ...prev,
+        isRunning: next,
+        targetEndTime: next ? Date.now() + prev.remainingSec * 1000 : null
+      };
     });
   };
 
@@ -151,6 +185,7 @@ export const FocusTimerModal = () => {
     setTimerState(prev => ({
       ...prev,
       remainingSec: prev.durationSec,
+      targetEndTime: null,
       isRunning: false,
       ambientSound: 'off'
     }));
@@ -251,6 +286,20 @@ export const FocusTimerModal = () => {
           </div>
           
           <div className="flex items-center space-x-1">
+            {/* PiP Screen Overlay Button */}
+            <button
+              onClick={togglePipOverlay}
+              title={timerState.isPipActive ? 'Close Screen Overlay' : 'Open Floating Screen Overlay (stays on top of all apps & tabs)'}
+              className={`p-2 rounded-xl border transition flex items-center gap-1.5 text-xs font-semibold ${
+                timerState.isPipActive
+                  ? 'bg-purple-600 text-white border-purple-400 shadow-lg shadow-purple-600/30'
+                  : 'text-purple-300 hover:text-white bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30'
+              }`}
+            >
+              <PictureInPicture2 className="w-4 h-4" />
+              <span className="hidden sm:inline">{timerState.isPipActive ? 'Overlay ON' : 'Screen Overlay'}</span>
+            </button>
+
             <button
               onClick={() => setShowSettings(!showSettings)}
               title="Configure Focus & Break Times"

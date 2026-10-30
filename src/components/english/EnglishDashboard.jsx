@@ -43,7 +43,7 @@ export const EnglishDashboard = () => {
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Gemini AI Conversation Partner, Speech Memos, Prompts & Vocabulary Vault
+              Live AI Speaking Partner (ChatGPT · Claude · Gemini), Speech Memos & Vocabulary Vault
             </p>
           </div>
         </div>
@@ -126,7 +126,7 @@ export const EnglishDashboard = () => {
           }`}
         >
           <Bot className="w-4 h-4" />
-          <span>🤖 AI English Speaking Partner (Gemini)</span>
+          <span>🤖 AI Live Speaking Partner (ChatGPT · Claude · Gemini)</span>
         </button>
 
         <button

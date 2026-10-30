@@ -14,7 +14,8 @@ import {
   Sparkles,
   Trophy,
   Users,
-  Shield
+  Shield,
+  Video
 } from 'lucide-react';
 
 export const Sidebar = () => {
@@ -75,6 +76,16 @@ export const Sidebar = () => {
       badgeColor: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
       color: 'text-sky-400',
       activeBg: 'bg-sky-600/15 border-sky-500/40 text-sky-300 shadow-glow-academic'
+    },
+    {
+      id: 'interview',
+      label: 'AI Live Interview Room',
+      icon: Video,
+      desc: 'Live 1-on-1 Meeting & Diagnostic Report',
+      badge: 'Live Meet 🎥',
+      badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+      color: 'text-purple-400',
+      activeBg: 'bg-purple-600/15 border-purple-500/40 text-purple-300 shadow-glow-gate'
     },
     {
       id: 'job',

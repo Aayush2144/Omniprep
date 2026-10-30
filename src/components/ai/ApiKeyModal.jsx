@@ -1,119 +1,296 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Key, CheckCircle2, AlertCircle, Eye, EyeOff, ExternalLink, X, Cpu } from 'lucide-react';
-import { getStoredApiKey, setStoredApiKey, getStoredModel, setStoredModel } from '../../utils/geminiClient.js';
+import {
+  Sparkles, Key, CheckCircle2, AlertCircle, Eye, EyeOff,
+  ExternalLink, X, Cpu, ChevronDown
+} from 'lucide-react';
+import {
+  // Gemini
+  getStoredApiKey, setStoredApiKey, getStoredModel, setStoredModel,
+  // OpenAI
+  getOpenAIKey, setOpenAIKey, getOpenAIModel, setOpenAIModel,
+  // Claude
+  getClaudeKey, setClaudeKey, getClaudeModel, setClaudeModel,
+  // Provider
+  getStoredProvider, setStoredProvider,
+} from '../../utils/geminiClient.js';
+
+// ─── Provider metadata ────────────────────────────────────────────────────────
+const PROVIDERS = [
+  {
+    id: 'gemini',
+    label: 'Google Gemini',
+    color: 'indigo',
+    badge: '🔵',
+    keyPlaceholder: 'AIzaSy...',
+    keyLink: 'https://aistudio.google.com/app/apikey',
+    keyLinkLabel: 'Get Free Key at Google AI Studio',
+    models: [
+      { value: 'auto', label: '✨ Auto-Detect Best Free Model (Recommended)' },
+      { value: 'gemini-2.0-flash', label: '⚡ Gemini 2.0 Flash (15 RPM Free)' },
+      { value: 'gemini-1.5-flash', label: '⚡ Gemini 1.5 Flash (15 RPM Free)' },
+      { value: 'gemini-1.5-flash-latest', label: '⚡ Gemini 1.5 Flash Latest' },
+      { value: 'gemini-1.5-pro', label: '🧠 Gemini 1.5 Pro (Paid Quota)' },
+    ],
+    defaultModel: 'auto',
+    note: 'Flash models are completely free (15 req/min). Pro models require a billing account.',
+    getKey: getStoredApiKey,
+    setKey: setStoredApiKey,
+    getModel: getStoredModel,
+    setModel: setStoredModel,
+  },
+  {
+    id: 'openai',
+    label: 'ChatGPT (OpenAI)',
+    color: 'emerald',
+    badge: '🟢',
+    keyPlaceholder: 'sk-...',
+    keyLink: 'https://platform.openai.com/api-keys',
+    keyLinkLabel: 'Get Key at OpenAI Platform',
+    models: [
+      { value: 'gpt-4o-mini', label: '⚡ GPT-4o Mini (Fastest & Cheapest)' },
+      { value: 'gpt-4o', label: '🧠 GPT-4o (Most Capable)' },
+      { value: 'gpt-4-turbo', label: '🚀 GPT-4 Turbo' },
+      { value: 'gpt-3.5-turbo', label: '💨 GPT-3.5 Turbo (Budget)' },
+    ],
+    defaultModel: 'gpt-4o-mini',
+    note: 'Requires an OpenAI account with billing enabled. GPT-4o-mini is the most cost-effective.',
+    getKey: getOpenAIKey,
+    setKey: setOpenAIKey,
+    getModel: getOpenAIModel,
+    setModel: setOpenAIModel,
+  },
+  {
+    id: 'claude',
+    label: 'Claude (Anthropic)',
+    color: 'amber',
+    badge: '🟠',
+    keyPlaceholder: 'sk-ant-...',
+    keyLink: 'https://console.anthropic.ic/settings/keys',
+    keyLinkLabel: 'Get Key at Anthropic Console',
+    models: [
+      { value: 'claude-3-5-haiku-20241022', label: '⚡ Claude 3.5 Haiku (Fastest)' },
+      { value: 'claude-3-5-sonnet-20241022', label: '🧠 Claude 3.5 Sonnet (Smartest)' },
+      { value: 'claude-3-opus-20240229', label: '🏆 Claude 3 Opus (Most Powerful)' },
+    ],
+    defaultModel: 'claude-3-5-haiku-20241022',
+    note: 'Requires Anthropic billing. Claude 3.5 Haiku is fastest and most affordable.',
+    getKey: getClaudeKey,
+    setKey: setClaudeKey,
+    getModel: getClaudeModel,
+    setModel: setClaudeModel,
+  },
+];
+
+const COLOR = {
+  indigo: {
+    border: 'border-indigo-500/30', bg: 'bg-indigo-500/20', text: 'text-indigo-400',
+    ring: 'focus:border-indigo-500', btn: 'bg-indigo-600 hover:bg-indigo-500',
+    activeBg: 'bg-indigo-600/20', activeBorder: 'border-indigo-500',
+  },
+  emerald: {
+    border: 'border-emerald-500/30', bg: 'bg-emerald-500/20', text: 'text-emerald-400',
+    ring: 'focus:border-emerald-500', btn: 'bg-emerald-600 hover:bg-emerald-500',
+    activeBg: 'bg-emerald-600/20', activeBorder: 'border-emerald-500',
+  },
+  amber: {
+    border: 'border-amber-500/30', bg: 'bg-amber-500/20', text: 'text-amber-400',
+    ring: 'focus:border-amber-500', btn: 'bg-amber-600 hover:bg-amber-500',
+    activeBg: 'bg-amber-600/20', activeBorder: 'border-amber-500',
+  },
+};
 
 export const ApiKeyModal = ({ isOpen, onClose }) => {
-  const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState('auto');
+  const [activeProvider, setActiveProvider] = useState('gemini');
+  const [keys, setKeys] = useState({ gemini: '', openai: '', claude: '' });
+  const [models, setModels] = useState({ gemini: 'auto', openai: 'gpt-4o-mini', claude: 'claude-3-5-haiku-20241022' });
   const [showKey, setShowKey] = useState(false);
-  const [testStatus, setTestStatus] = useState(null); // null | 'testing' | 'valid' | 'invalid'
-  const [activeModelName, setActiveModelName] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [testStatus, setTestStatus] = useState(null);
+  const [testMessage, setTestMessage] = useState('');
 
   useEffect(() => {
     if (isOpen) {
-      setApiKey(getStoredApiKey());
-      setModel(getStoredModel());
+      setActiveProvider(getStoredProvider());
+      setKeys({
+        gemini: getStoredApiKey(),
+        openai: getOpenAIKey(),
+        claude: getClaudeKey(),
+      });
+      setModels({
+        gemini: getStoredModel(),
+        openai: getOpenAIModel(),
+        claude: getClaudeModel(),
+      });
       setTestStatus(null);
-      setErrorMessage('');
-      setActiveModelName('');
+      setTestMessage('');
+      setShowKey(false);
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
+  const provider = PROVIDERS.find((p) => p.id === activeProvider);
+  const c = COLOR[provider.color];
+
   const handleSave = () => {
-    setStoredApiKey(apiKey);
-    setStoredModel(model);
+    // Save all keys + models
+    setStoredApiKey(keys.gemini);
+    setStoredModel(models.gemini);
+    setOpenAIKey(keys.openai);
+    setOpenAIModel(models.openai);
+    setClaudeKey(keys.claude);
+    setClaudeModel(models.claude);
+    setStoredProvider(activeProvider);
     onClose();
   };
 
   const handleTestKey = async () => {
-    if (!apiKey.trim()) {
+    const key = keys[activeProvider]?.trim();
+    if (!key) {
       setTestStatus('invalid');
-      setErrorMessage('Please enter an API key first.');
+      setTestMessage('Please enter an API key first.');
       return;
     }
-
     setTestStatus('testing');
-    setErrorMessage('');
-    setActiveModelName('');
+    setTestMessage('');
 
     try {
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apiKey: apiKey.trim(),
-          model: model,
-          prompt: 'Say "Gemini API Connection Verified!" in 5 words.'
-        })
-      });
+      if (activeProvider === 'gemini') {
+        // Test via backend proxy
+        const res = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            apiKey: key,
+            model: models.gemini,
+            prompt: 'Say "Gemini API Connection Verified!" in 5 words.',
+          }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          setTestStatus('valid');
+          setTestMessage(`Connected! Active engine: ${json.usedModel || models.gemini}`);
+          setStoredApiKey(key);
+          setStoredModel(models.gemini);
+        } else {
+          setTestStatus('invalid');
+          setTestMessage(json.error || 'Invalid Gemini API key.');
+        }
 
-      const json = await res.json();
-      if (json.success) {
-        setTestStatus('valid');
-        setActiveModelName(json.usedModel || 'gemini-2.0-flash');
-        setStoredApiKey(apiKey.trim());
-        setStoredModel(model);
-      } else {
-        setTestStatus('invalid');
-        setErrorMessage(json.error || 'Invalid API Key or Model unavailable.');
+      } else if (activeProvider === 'openai') {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+          body: JSON.stringify({
+            model: models.openai || 'gpt-4o-mini',
+            messages: [{ role: 'user', content: 'Say "OpenAI Connection Verified!" in 5 words.' }],
+            max_tokens: 20,
+          }),
+        });
+        const json = await res.json();
+        if (json.choices?.[0]?.message?.content) {
+          setTestStatus('valid');
+          setTestMessage(`Connected! Model: ${json.model || models.openai}`);
+          setOpenAIKey(key);
+          setOpenAIModel(models.openai);
+        } else {
+          setTestStatus('invalid');
+          setTestMessage(json.error?.message || 'Invalid OpenAI API key.');
+        }
+
+      } else if (activeProvider === 'claude') {
+        const res = await fetch('/api/ai/claude-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            apiKey: key,
+            model: models.claude || 'claude-3-5-haiku-20241022',
+            systemInstruction: 'You are a helpful assistant.',
+            promptText: 'Say "Claude Connection Verified!" in 5 words.',
+          }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          setTestStatus('valid');
+          setTestMessage(`Connected! Model: ${models.claude}`);
+          setClaudeKey(key);
+          setClaudeModel(models.claude);
+        } else {
+          setTestStatus('invalid');
+          setTestMessage(json.error || 'Invalid Claude API key.');
+        }
       }
     } catch (err) {
       setTestStatus('invalid');
-      setErrorMessage(err.message || 'Connection failed');
+      setTestMessage(err.message || 'Connection failed.');
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-md bg-[#0f172a] border border-indigo-500/30 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5">
-        
+      <div className="relative w-full max-w-lg bg-[#0f172a] border border-white/10 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-white/10">
           <div className="flex items-center space-x-2.5">
-            <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-              <Sparkles className="w-5 h-5" />
+            <div className={`p-2 rounded-xl ${c.bg} ${c.text} border ${c.border}`}>
+              <Key className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-sm sm:text-base text-white">Google Gemini API Configuration</h3>
-              <p className="text-xs text-slate-400">Power AI Technical Interviews & English Speaking</p>
+              <h3 className="font-bold text-sm sm:text-base text-white">AI Provider Configuration</h3>
+              <p className="text-xs text-slate-400">ChatGPT · Claude · Gemini — choose your coach</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
-          >
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition">
             <X className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Provider Tabs */}
+        <div className="grid grid-cols-3 gap-2">
+          {PROVIDERS.map((p) => {
+            const pc = COLOR[p.color];
+            const isActive = activeProvider === p.id;
+            return (
+              <button
+                key={p.id}
+                onClick={() => { setActiveProvider(p.id); setTestStatus(null); setTestMessage(''); }}
+                className={`p-3 rounded-2xl border text-center transition ${
+                  isActive
+                    ? `${pc.activeBg} ${pc.activeBorder} text-white shadow-lg`
+                    : 'bg-slate-900/60 border-white/5 text-slate-400 hover:bg-slate-800'
+                }`}
+              >
+                <div className="text-lg mb-0.5">{p.badge}</div>
+                <div className="text-[11px] font-bold text-white leading-tight">{p.label}</div>
+              </button>
+            );
+          })}
         </div>
 
         {/* API Key Input */}
         <div className="space-y-2">
           <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-            <span>Gemini API Key</span>
+            <span>{provider.label} API Key</span>
             <a
-              href="https://aistudio.google.com/app/apikey"
+              href={provider.keyLink}
               target="_blank"
               rel="noreferrer"
-              className="text-[11px] text-indigo-400 hover:underline flex items-center gap-1"
+              className={`text-[11px] ${c.text} hover:underline flex items-center gap-1`}
             >
-              <span>Get Free Key at Google AI Studio</span>
+              <span>{provider.keyLinkLabel}</span>
               <ExternalLink className="w-3 h-3" />
             </a>
           </label>
-
           <div className="relative">
             <input
               type={showKey ? 'text' : 'password'}
-              value={apiKey}
+              value={keys[activeProvider] || ''}
               onChange={(e) => {
-                setApiKey(e.target.value);
+                setKeys((prev) => ({ ...prev, [activeProvider]: e.target.value }));
                 setTestStatus(null);
               }}
-              placeholder="AIzaSy..."
-              className="w-full bg-slate-950 border border-white/15 rounded-xl pl-3.5 pr-10 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 font-mono"
+              placeholder={provider.keyPlaceholder}
+              className={`w-full bg-slate-950 border border-white/15 rounded-xl pl-3.5 pr-10 py-2 text-xs text-white placeholder-slate-600 focus:outline-none ${c.ring} font-mono`}
             />
             <button
               type="button"
@@ -127,60 +304,63 @@ export const ApiKeyModal = ({ isOpen, onClose }) => {
 
         {/* Model Selector */}
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-            <Cpu className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Gemini AI Model Engine:</span>
+          <label className={`text-xs font-semibold text-slate-300 flex items-center gap-1.5`}>
+            <Cpu className={`w-3.5 h-3.5 ${c.text}`} />
+            <span>{provider.label} Model:</span>
           </label>
           <select
-            value={model}
+            value={models[activeProvider] || provider.defaultModel}
             onChange={(e) => {
-              setModel(e.target.value);
+              setModels((prev) => ({ ...prev, [activeProvider]: e.target.value }));
               setTestStatus(null);
             }}
-            className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+            className={`w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-xs text-white focus:outline-none ${c.ring}`}
           >
-            <option value="auto">✨ Auto-Detect Best Free Model (Recommended)</option>
-            <option value="gemini-2.0-flash">⚡ Gemini 2.0 Flash (15 RPM Free Tier)</option>
-            <option value="gemini-1.5-flash">⚡ Gemini 1.5 Flash (15 RPM Free Tier)</option>
-            <option value="gemini-1.5-flash-latest">⚡ Gemini 1.5 Flash Latest</option>
-            <option value="gemini-1.5-pro">🧠 Gemini 1.5 Pro (Low/Zero Free Quota)</option>
+            {provider.models.map((m) => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
           </select>
-          <p className="text-[10px] text-slate-500">
-            Note: <strong>Flash models</strong> are completely free (15 requests/min). <strong>Pro models</strong> may require a billing account.
-          </p>
+          <p className="text-[10px] text-slate-500">{provider.note}</p>
         </div>
 
-        {/* Test Result Message */}
+        {/* Active Provider Badge */}
+        <div className={`p-3 rounded-xl ${c.bg} border ${c.border} text-xs text-slate-300 flex items-center gap-2`}>
+          <Sparkles className={`w-4 h-4 ${c.text} shrink-0`} />
+          <span>
+            Active coach for English Practice:{' '}
+            <strong className="text-white">{PROVIDERS.find((p) => p.id === getStoredProvider())?.label || 'Gemini'}</strong>
+            {' '}— save to switch to <strong className="text-white">{provider.label}</strong>.
+          </span>
+        </div>
+
+        {/* Test Result */}
         {testStatus === 'valid' && (
           <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 animate-fade-in">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <div>
-              <strong>Gemini API Connected!</strong>
-              <div className="text-[11px] text-emerald-400/90 mt-0.5">
-                Active engine verified: <span className="font-mono font-semibold text-white">{activeModelName}</span>
-              </div>
+              <strong>Connection Successful!</strong>
+              <div className="text-[11px] text-emerald-400/90 mt-0.5 font-mono">{testMessage}</div>
             </div>
           </div>
         )}
-
         {testStatus === 'invalid' && (
           <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2 animate-fade-in">
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-            <span>{errorMessage || 'Failed to authenticate with Gemini API.'}</span>
+            <span>{testMessage || 'Authentication failed. Check your API key.'}</span>
           </div>
         )}
 
-        {/* Action Buttons */}
+        {/* Actions */}
         <div className="flex items-center justify-between pt-2 border-t border-white/5">
           <button
             onClick={handleTestKey}
             disabled={testStatus === 'testing'}
-            className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-white/10 transition flex items-center gap-1.5"
+            className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-white/10 transition flex items-center gap-1.5 disabled:opacity-50"
           >
             {testStatus === 'testing' ? (
               <>
-                <span className="w-3 h-3 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" />
-                <span>Testing Connection...</span>
+                <span className={`w-3 h-3 rounded-full border-2 ${c.text} border-t-transparent animate-spin`} />
+                <span>Testing...</span>
               </>
             ) : (
               <>
@@ -191,17 +371,14 @@ export const ApiKeyModal = ({ isOpen, onClose }) => {
           </button>
 
           <div className="flex items-center space-x-2">
-            <button
-              onClick={onClose}
-              className="px-3.5 py-1.5 text-xs text-slate-400 hover:text-white"
-            >
+            <button onClick={onClose} className="px-3.5 py-1.5 text-xs text-slate-400 hover:text-white">
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/30 transition"
+              className={`px-4 py-1.5 ${c.btn} text-white rounded-xl text-xs font-semibold shadow-lg transition`}
             >
-              Save Configuration
+              Save & Activate
             </button>
           </div>
         </div>
