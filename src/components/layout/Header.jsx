@@ -21,6 +21,7 @@ import {
 import { getStoredApiKey } from '../../utils/geminiClient.js';
 import { ApiKeyModal } from '../ai/ApiKeyModal.jsx';
 import { calculateGamification } from '../../utils/gamification.js';
+import { formatDuration } from '../../utils/analyticsCalculators.js';
 
 export const Header = () => {
   const { data, dbStatus, timerState, setTimerState, exportDataJson, importDataJson, resetToZeroData, setActiveTab } = useTracker();
@@ -35,7 +36,8 @@ export const Header = () => {
 
   const game = calculateGamification(data);
   const hasApiKey = Boolean(getStoredApiKey());
-  const todayStr = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const todayLog = (data.activityLogs || []).find(l => l.date === todayStr) || { total: 0 };
   const dailyGoal = data.profile?.dailyHourGoal || 7.5;
   const progressPct = dailyGoal > 0 ? Math.min(100, Math.round(((todayLog.total || 0) / dailyGoal) * 100)) : 0;
@@ -185,7 +187,9 @@ export const Header = () => {
           <div className="hidden lg:flex items-center space-x-2 bg-slate-800/50 border border-white/5 px-3 py-1.5 rounded-lg text-xs">
             <Clock className="w-3.5 h-3.5 text-indigo-400" />
             <span className="text-slate-400">Today:</span>
-            <span className="text-white font-medium">{todayLog.total || 0}h / {dailyGoal}h</span>
+            <span className="text-white font-medium font-mono">
+              {formatDuration(todayLog.total || 0)} / {formatDuration(dailyGoal)}
+            </span>
             <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden ml-1">
               <div
                 className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 rounded-full transition-all duration-500"
