@@ -50,8 +50,9 @@ export const calculateOverallAnalytics = (data) => {
     { subject: 'Habit Discipline', score: Math.round((data.profile.currentStreak / 30) * 100), fullMark: 100 }
   ];
 
-  // Today's hours
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Today's hours (Local Calendar Date)
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const todayLog = logs.find(l => l.date === todayStr) || { gate: 0, academic: 0, job: 0, english: 0, total: 0 };
 
   return {

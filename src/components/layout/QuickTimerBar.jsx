@@ -1,11 +1,11 @@
 import React from 'react';
 import { useTracker } from '../../context/TrackerContext';
-import { Play, Pause, Square, Maximize2, Sparkles, Coffee, Flame, SkipForward, PictureInPicture2 } from 'lucide-react';
+import { Play, Pause, Square, Maximize2, Sparkles, Coffee, Flame, SkipForward, PictureInPicture2, CheckCircle2 } from 'lucide-react';
 import { soundEngine } from '../../utils/audioSynth';
 import { pipOverlay } from '../../utils/pipOverlay';
 
 export const QuickTimerBar = () => {
-  const { timerState, setTimerState } = useTracker();
+  const { timerState, setTimerState, logFocusSession } = useTracker();
 
   if (!timerState.isRunning && timerState.remainingSec === timerState.durationSec) {
     return null; // Don't show if not active
@@ -60,6 +60,22 @@ export const QuickTimerBar = () => {
       ...prev,
       isRunning: false,
       remainingSec: prev.durationSec,
+      targetEndTime: null,
+      ambientSound: 'off'
+    }));
+  };
+
+  const doneAndSaveTimer = () => {
+    const elapsedSec = Math.max(0, timerState.durationSec - timerState.remainingSec);
+    const hours = elapsedSec / 3600;
+    logFocusSession(timerState.category, hours);
+    soundEngine.playCompletionChime();
+    soundEngine.stopAmbient();
+    setTimerState(prev => ({
+      ...prev,
+      isRunning: false,
+      remainingSec: prev.durationSec,
+      targetEndTime: null,
       ambientSound: 'off'
     }));
   };
@@ -149,10 +165,19 @@ export const QuickTimerBar = () => {
             <SkipForward className="w-3.5 h-3.5" />
           </button>
           
+          {/* Done & Save Button */}
+          <button
+            onClick={doneAndSaveTimer}
+            className="p-1.5 hover:bg-emerald-500/30 text-emerald-300 hover:text-white rounded-lg transition border border-emerald-500/40"
+            title="Done: Save study time to Dashboard"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+          </button>
+
           <button
             onClick={stopTimer}
-            className="p-1.5 hover:bg-white/20 rounded-lg text-white transition"
-            title="Reset"
+            className="p-1.5 hover:bg-rose-500/30 text-rose-300 hover:text-white rounded-lg transition"
+            title="Stop & Reset (Discard)"
           >
             <Square className="w-3.5 h-3.5" />
           </button>

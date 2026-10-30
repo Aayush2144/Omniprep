@@ -280,8 +280,12 @@ export const TrackerProvider = ({ children }) => {
 
   // Handler: Log completed focus session into today's activity log
   const logFocusSession = (category, hours) => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const roundedHours = parseFloat(hours.toFixed(2));
+    // Treat any non-empty category or fallback to 'gate'
+    const cleanCat = ['gate', 'academic', 'job', 'english'].includes(category) ? category : 'gate';
+    // Allow even 15-20 seconds to log as fractional hours so user's work is never lost
+    const parsedHours = Math.max(0.01, parseFloat(hours.toFixed(4)));
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     setData(prev => {
       const logs = [...(prev.activityLogs || [])];
@@ -289,29 +293,29 @@ export const TrackerProvider = ({ children }) => {
 
       if (todayIndex >= 0) {
         const current = logs[todayIndex];
-        const newCatHours = parseFloat(((current[category] || 0) + roundedHours).toFixed(2));
-        const newTotal = parseFloat(((current.total || 0) + roundedHours).toFixed(2));
+        const newCatHours = parseFloat(((current[cleanCat] || 0) + parsedHours).toFixed(3));
+        const newTotal = parseFloat(((current.total || 0) + parsedHours).toFixed(3));
         logs[todayIndex] = {
           ...current,
-          [category]: newCatHours,
+          [cleanCat]: newCatHours,
           total: newTotal
         };
       } else {
         logs.push({
           date: todayStr,
-          gate: category === 'gate' ? roundedHours : 0,
-          academic: category === 'academic' ? roundedHours : 0,
-          job: category === 'job' ? roundedHours : 0,
-          english: category === 'english' ? roundedHours : 0,
-          total: roundedHours,
+          gate: cleanCat === 'gate' ? parsedHours : 0,
+          academic: cleanCat === 'academic' ? parsedHours : 0,
+          job: cleanCat === 'job' ? parsedHours : 0,
+          english: cleanCat === 'english' ? parsedHours : 0,
+          total: parsedHours,
           tasksCompleted: 1,
           streakActive: true
         });
       }
 
       let updatedEnglish = prev.english;
-      if (category === 'english') {
-        const addedMins = Math.round(hours * 60);
+      if (cleanCat === 'english') {
+        const addedMins = Math.max(1, Math.round(parsedHours * 60));
         updatedEnglish = {
           ...prev.english,
           minutesPracticedToday: (prev.english?.minutesPracticedToday || 0) + addedMins

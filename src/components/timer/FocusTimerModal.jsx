@@ -4,6 +4,7 @@ import {
   X,
   Play,
   Pause,
+  Square,
   RotateCcw,
   CheckCircle2,
   Volume2,
@@ -235,20 +236,35 @@ export const FocusTimerModal = () => {
     });
   };
 
-  // Complete and Log Focus Time immediately
-  const completeAndLogNow = () => {
-    if (timerState.mode === 'focus') {
-      const elapsedSec = timerState.durationSec - timerState.remainingSec;
-      const hours = Math.max(0.05, elapsedSec / 3600);
-      logFocusSession(timerState.category, hours);
-    }
+  // Stop and Cancel session without saving
+  const stopAndDiscard = () => {
+    soundEngine.stopAmbient();
+    setTimerState(prev => ({
+      ...prev,
+      remainingSec: prev.durationSec,
+      targetEndTime: null,
+      isRunning: false,
+      ambientSound: 'off'
+    }));
+  };
+
+  // Done & Save Focus Time into Dashboard immediately
+  const handleDoneAndSave = () => {
+    const elapsedSec = Math.max(0, timerState.durationSec - timerState.remainingSec);
+    const hours = elapsedSec / 3600;
+    
+    // Log to dashboard activity log
+    logFocusSession(timerState.category, hours);
     soundEngine.playCompletionChime();
     soundEngine.stopAmbient();
+
+    // Reset timer and close modal
     setTimerState(prev => ({
       ...prev,
       isOpen: false,
       isRunning: false,
       remainingSec: prev.durationSec,
+      targetEndTime: null,
       ambientSound: 'off'
     }));
   };
@@ -617,19 +633,31 @@ export const FocusTimerModal = () => {
           </div>
         </div>
 
-        {/* PRIMARY CONTROLS (Play/Pause, Reset, Skip) */}
-        <div className="flex items-center justify-center gap-3 my-4">
+        {/* PRIMARY CONTROLS (Stop, Play/Pause, Done & Save, Skip) */}
+        <div className="flex flex-wrap items-center justify-center gap-3 my-4">
+          {/* Stop / Discard Button */}
           <button
-            onClick={resetTimer}
-            title="Reset Timer"
-            className="p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white transition"
+            onClick={stopAndDiscard}
+            title="Stop & Reset Timer (Discard session)"
+            className="flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 hover:text-white transition text-xs font-semibold"
           >
-            <RotateCcw className="w-5 h-5" />
+            <Square className="w-4 h-4 fill-current" />
+            <span>Stop</span>
           </button>
 
+          {/* Reset Icon Button */}
+          <button
+            onClick={resetTimer}
+            title="Reset to Start of Session"
+            className="p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white transition"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+
+          {/* Play / Pause Primary Button */}
           <button
             onClick={toggleRunning}
-            className={`px-8 py-3.5 rounded-2xl text-white font-bold text-sm transition-all shadow-xl flex items-center gap-2 ${
+            className={`px-7 py-3.5 rounded-2xl text-white font-bold text-sm transition-all shadow-xl flex items-center gap-2 ${
               timerState.isRunning
                 ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/30'
                 : isFocusMode
@@ -650,12 +678,23 @@ export const FocusTimerModal = () => {
             )}
           </button>
 
+          {/* Done & Save Button (Always accessible to save session time into dashboard) */}
+          <button
+            onClick={handleDoneAndSave}
+            title="Done: Finish session now & save study time to Dashboard"
+            className="flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 border border-emerald-400 text-white shadow-lg shadow-emerald-600/30 transition text-xs font-bold"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Done & Save</span>
+          </button>
+
+          {/* Skip Stage Button */}
           <button
             onClick={skipToNextStage}
             title={isFocusMode ? 'Skip to Break ☕' : 'Skip to Focus 🎯'}
             className="p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white transition"
           >
-            <SkipForward className="w-5 h-5" />
+            <SkipForward className="w-4 h-4" />
           </button>
         </div>
 
@@ -691,15 +730,18 @@ export const FocusTimerModal = () => {
           </div>
         </div>
 
-        {/* Log Focus Session Early */}
+        {/* Quick Done / Log Helper Footer */}
         {isFocusMode && timerState.remainingSec < timerState.durationSec && (
-          <div className="pt-2 border-t border-white/10 flex justify-end">
+          <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs">
+            <span className="text-slate-400">
+              Active Focus Time: <strong className="text-white font-mono">{Math.round((timerState.durationSec - timerState.remainingSec) / 60)} mins</strong>
+            </span>
             <button
-              onClick={completeAndLogNow}
-              className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1.5 transition"
+              onClick={handleDoneAndSave}
+              className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1.5 transition px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Log Completed Focus ({Math.round((timerState.durationSec - timerState.remainingSec) / 60)} mins) & Close</span>
+              <span>Save & Log to Dashboard Now</span>
             </button>
           </div>
         )}
