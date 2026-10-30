@@ -25,6 +25,65 @@ function renderProgressBar(current, goal) {
   return `[<code>${bar}</code>] ${pct}%`;
 }
 
+function calculateStreak(logs = []) {
+  if (!logs || logs.length === 0) {
+    return { currentStreak: 0, longestStreak: 0, isStudiedToday: false };
+  }
+  const activeDates = new Set(
+    logs.filter(l => (Number(l.total) || 0) > 0 || (Number(l.tasksCompleted) || 0) > 0).map(l => l.date)
+  );
+  const now = new Date();
+  const formatYMD = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const todayStr = formatYMD(now);
+  const isStudiedToday = activeDates.has(todayStr);
+
+  let currentStreak = 0;
+  const checkDate = new Date(now);
+
+  if (isStudiedToday) {
+    currentStreak = 1;
+    checkDate.setDate(checkDate.getDate() - 1);
+  } else {
+    checkDate.setDate(checkDate.getDate() - 1);
+    if (!activeDates.has(formatYMD(checkDate))) {
+      currentStreak = 0;
+    } else {
+      currentStreak = 1;
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+  }
+
+  if (currentStreak > 0) {
+    while (activeDates.has(formatYMD(checkDate))) {
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+  }
+
+  const sortedDates = Array.from(activeDates).sort();
+  let longestStreak = 0;
+  let tempStreak = 0;
+  let prevDate = null;
+
+  for (const dateStr of sortedDates) {
+    const cur = new Date(dateStr + 'T00:00:00');
+    if (prevDate) {
+      const diffMs = cur.getTime() - prevDate.getTime();
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+      if (diffDays === 1) tempStreak++;
+      else if (diffDays > 1) tempStreak = 1;
+    } else {
+      tempStreak = 1;
+    }
+    prevDate = cur;
+    if (tempStreak > longestStreak) longestStreak = tempStreak;
+  }
+
+  longestStreak = Math.max(longestStreak, currentStreak);
+  return { currentStreak, longestStreak, isStudiedToday };
+}
+
 // Interactive reply keyboard shown at bottom of user's Telegram chat
 export const TELEGRAM_KEYBOARD = {
   keyboard: [
@@ -82,13 +141,14 @@ async function handleProgressQuery(chatId, senderName) {
   const todayLog = logs.find(l => l.date === todayStr) || { gate: 0, academic: 0, job: 0, english: 0, total: user?.today_hours || 0 };
 
   const dailyGoal = profile.dailyHourGoal || 7.5;
-  const streak = profile.currentStreak || user?.streak || 0;
+  const streakInfo = calculateStreak(logs);
+  const streak = streakInfo.currentStreak || profile.currentStreak || user?.streak || 0;
 
   const msg = `📊 <b>Today's Study Progress Report</b>
 ━━━━━━━━━━━━━━━━━━━━
 👤 <b>Candidate:</b> ${senderName || profile.name || 'Aayush'}
 🎯 <b>Target Role:</b> ${profile.targetRole || 'Data Scientist'}
-🔥 <b>Active Streak:</b> ${streak} Days in a row!
+🔥 <b>Active Streak:</b> ${streak} Days in a row! ${streakInfo.isStudiedToday ? '(Logged today ✅)' : '(Study today to keep it ⏳)'}
 
 ⏱️ <b>Today's Tracked Hours:</b>
 ${renderProgressBar(todayLog.total || 0, dailyGoal)}
@@ -135,15 +195,18 @@ async function handleStreakQuery(chatId, senderName) {
   const { user, state } = await getLatestCandidateState();
   const profile = state?.profile || {};
   const logs = state?.activityLogs || [];
+  const streakInfo = calculateStreak(logs);
+  const currentStreak = streakInfo.currentStreak || profile.currentStreak || user?.streak || 0;
+  const longestStreak = Math.max(streakInfo.longestStreak, profile.longestStreak || 0);
   const totalAllTime = logs.reduce((s, l) => s + (l.total || 0), 0) || user?.total_hours || 0;
 
   const msg = `🔥 <b>Consistency & Master Stats</b>
 ━━━━━━━━━━━━━━━━━━━━
-🔥 <b>Current Streak:</b> ${profile.currentStreak || user?.streak || 0} Days
-🏆 <b>Longest Streak:</b> ${profile.longestStreak || 42} Days
+🔥 <b>Current Streak:</b> ${currentStreak} Days ${streakInfo.isStudiedToday ? '✅' : '⏳ (Pending today)'}
+🏆 <b>Longest Streak:</b> ${longestStreak} Days
 ⏱️ <b>All-Time Focus Tracked:</b> ${formatDuration(totalAllTime)}
 📚 <b>Total Logged Days:</b> ${logs.length || 1} Days
-🎯 <b>Daily Goal:</b> ${profile.dailyHourGoal || 7.5}h / day
+🎯 <b>Daily Goal:</b> ${formatDuration(profile.dailyHourGoal || 7.5)} / day
 
 ⚡ <i>"Consistency is the DNA of mastery."</i>`;
 

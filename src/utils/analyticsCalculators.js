@@ -13,6 +13,81 @@ export const formatDuration = (decimalHours) => {
   return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
 };
 
+// Calculate active consecutive study streak & historical best from activity logs
+export const calculateStreak = (logs = []) => {
+  if (!logs || logs.length === 0) {
+    return { currentStreak: 0, longestStreak: 0, isStudiedToday: false };
+  }
+
+  // Set of dates with positive study activity (> 0h or tasksCompleted > 0)
+  const activeDates = new Set(
+    logs
+      .filter(l => (Number(l.total) || 0) > 0 || (Number(l.tasksCompleted) || 0) > 0)
+      .map(l => l.date)
+  );
+
+  const now = new Date();
+  const formatYMD = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  const todayStr = formatYMD(now);
+  const isStudiedToday = activeDates.has(todayStr);
+
+  let currentStreak = 0;
+  const checkDate = new Date(now);
+
+  if (isStudiedToday) {
+    currentStreak = 1;
+    checkDate.setDate(checkDate.getDate() - 1);
+  } else {
+    // Hasn't studied today yet, check if yesterday had activity to keep streak alive
+    checkDate.setDate(checkDate.getDate() - 1);
+    if (!activeDates.has(formatYMD(checkDate))) {
+      currentStreak = 0;
+    } else {
+      currentStreak = 1;
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+  }
+
+  // Keep stepping backward while consecutive days are active
+  if (currentStreak > 0) {
+    while (activeDates.has(formatYMD(checkDate))) {
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+  }
+
+  // Calculate historical longest streak
+  const sortedDates = Array.from(activeDates).sort();
+  let longestStreak = 0;
+  let tempStreak = 0;
+  let prevDate = null;
+
+  for (const dateStr of sortedDates) {
+    const cur = new Date(dateStr + 'T00:00:00');
+    if (prevDate) {
+      const diffMs = cur.getTime() - prevDate.getTime();
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+      if (diffDays === 1) {
+        tempStreak++;
+      } else if (diffDays > 1) {
+        tempStreak = 1;
+      }
+    } else {
+      tempStreak = 1;
+    }
+    prevDate = cur;
+    if (tempStreak > longestStreak) {
+      longestStreak = tempStreak;
+    }
+  }
+
+  longestStreak = Math.max(longestStreak, currentStreak);
+
+  return { currentStreak, longestStreak, isStudiedToday };
+};
+
 export const calculateOverallAnalytics = (data) => {
   const logs = data.activityLogs || [];
   const last7Days = logs.slice(-7);
@@ -55,12 +130,15 @@ export const calculateOverallAnalytics = (data) => {
   const jobScore = Math.min(100, Math.round((jobTotal / (30 * 2.0)) * 100));
   const englishScore = Math.min(100, Math.round((englishTotal / (30 * 0.75)) * 100));
 
+  const streakInfo = calculateStreak(logs);
+  const effectiveStreak = streakInfo.currentStreak || data.profile?.currentStreak || 0;
+
   const radarBalance = [
     { subject: 'GATE DS/AI', score: gateScore, fullMark: 100 },
     { subject: 'Academics', score: academicScore, fullMark: 100 },
     { subject: 'Job & DS Rev', score: jobScore, fullMark: 100 },
     { subject: 'English Fluency', score: englishScore, fullMark: 100 },
-    { subject: 'Habit Discipline', score: Math.round((data.profile.currentStreak / 30) * 100), fullMark: 100 }
+    { subject: 'Habit Discipline', score: Math.round((effectiveStreak / 30) * 100), fullMark: 100 }
   ];
 
   // Today's hours (Local Calendar Date)
@@ -75,7 +153,12 @@ export const calculateOverallAnalytics = (data) => {
     categoryDistribution,
     dailyTrends,
     radarBalance,
-    todayLog
+    todayLog,
+    streakInfo: {
+      ...streakInfo,
+      currentStreak: effectiveStreak,
+      longestStreak: Math.max(streakInfo.longestStreak, data.profile?.longestStreak || 0)
+    }
   };
 };
 

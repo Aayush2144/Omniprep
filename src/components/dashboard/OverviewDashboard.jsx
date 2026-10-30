@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTracker } from '../../context/TrackerContext';
+import DailyTargetModal from '../profile/DailyTargetModal';
 import {
   Flame,
   Clock,
@@ -42,7 +43,12 @@ import { calculateGamification } from '../../utils/gamification.js';
 
 export const OverviewDashboard = () => {
   const { data, setActiveTab, setTimerState } = useTracker();
+  const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
   const analytics = calculateOverallAnalytics(data);
+
+  const currentStreak = analytics.streakInfo?.currentStreak ?? data.profile?.currentStreak ?? 0;
+  const longestStreak = analytics.streakInfo?.longestStreak ?? data.profile?.longestStreak ?? 42;
+  const isStudiedToday = analytics.streakInfo?.isStudiedToday ?? false;
   const game = calculateGamification(data);
 
   const pillars = [
@@ -180,10 +186,23 @@ export const OverviewDashboard = () => {
         {/* Today's Focus */}
         <div className="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-medium">Today's Focus</span>
-            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
-              <Clock className="w-4 h-4" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium">Today's Focus</span>
+              <button
+                onClick={() => setIsTargetModalOpen(true)}
+                className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition cursor-pointer"
+                title="Customize Daily Target"
+              >
+                Adjust ✏️
+              </button>
             </div>
+            <button
+              onClick={() => setIsTargetModalOpen(true)}
+              className="p-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 transition"
+              title="Click to customize daily goal"
+            >
+              <Clock className="w-4 h-4" />
+            </button>
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold text-white font-mono">
@@ -221,17 +240,30 @@ export const OverviewDashboard = () => {
         <div className="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-medium">Master Streak</span>
-            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+            <button
+              onClick={() => setIsTargetModalOpen(true)}
+              className="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 transition"
+              title="Click for streak & target rules"
+            >
               <Flame className="w-4 h-4" />
-            </div>
+            </button>
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold text-white font-mono flex items-center gap-1.5">
-              <span>{data.profile?.currentStreak || 0}</span>
+              <span>{currentStreak}</span>
               <span className="text-xs font-normal text-slate-400">Days</span>
+              {isStudiedToday ? (
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  Active
+                </span>
+              ) : currentStreak > 0 ? (
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 animate-pulse">
+                  Study today
+                </span>
+              ) : null}
             </div>
             <div className="text-[11px] text-slate-400 mt-1">
-              Personal Best: {data.profile?.longestStreak || 42} days
+              Personal Best: {longestStreak} days
             </div>
           </div>
         </div>
@@ -385,6 +417,12 @@ export const OverviewDashboard = () => {
         </div>
 
       </div>
+
+      {/* Daily Focus Target & Streak Explanation Modal */}
+      <DailyTargetModal
+        isOpen={isTargetModalOpen}
+        onClose={() => setIsTargetModalOpen(false)}
+      />
 
     </div>
   );

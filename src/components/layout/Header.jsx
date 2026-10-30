@@ -22,8 +22,9 @@ import {
 import { getStoredApiKey } from '../../utils/geminiClient.js';
 import { ApiKeyModal } from '../ai/ApiKeyModal.jsx';
 import { TelegramNotifierModal } from '../notifications/TelegramNotifierModal.jsx';
+import DailyTargetModal from '../profile/DailyTargetModal.jsx';
 import { calculateGamification } from '../../utils/gamification.js';
-import { formatDuration } from '../../utils/analyticsCalculators.js';
+import { formatDuration, calculateStreak } from '../../utils/analyticsCalculators.js';
 
 export const Header = () => {
   const { data, dbStatus, timerState, setTimerState, exportDataJson, importDataJson, resetToZeroData, setActiveTab } = useTracker();
@@ -31,6 +32,7 @@ export const Header = () => {
   
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
+  const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [liveStudierCount, setLiveStudierCount] = useState(0);
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
@@ -44,6 +46,9 @@ export const Header = () => {
   const todayLog = (data.activityLogs || []).find(l => l.date === todayStr) || { total: 0 };
   const dailyGoal = data.profile?.dailyHourGoal || 7.5;
   const progressPct = dailyGoal > 0 ? Math.min(100, Math.round(((todayLog.total || 0) / dailyGoal) * 100)) : 0;
+
+  const streakInfo = calculateStreak(data.activityLogs || []);
+  const effectiveStreak = streakInfo.currentStreak || data.profile?.currentStreak || 0;
 
   // Listen for PWA Install Prompt
   useEffect(() => {
@@ -181,14 +186,22 @@ export const Header = () => {
           </div>
 
           {/* Streak Pill */}
-          <div className="hidden sm:flex items-center space-x-1.5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 px-3 py-1.5 rounded-full text-amber-400 text-xs font-semibold">
+          <button
+            onClick={() => setIsTargetModalOpen(true)}
+            className="hidden sm:flex items-center space-x-1.5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border border-amber-500/20 px-3 py-1.5 rounded-full text-amber-400 text-xs font-semibold transition cursor-pointer"
+            title="Active Consecutive Study Streak - Click to view or adjust daily target"
+          >
             <Flame className="w-4 h-4 text-orange-500 fill-orange-500" />
-            <span>{data.profile?.currentStreak || 0}d Streak</span>
-          </div>
+            <span>{effectiveStreak}d Streak</span>
+          </button>
 
           {/* Daily Goal Mini-Bar */}
-          <div className="hidden lg:flex items-center space-x-2 bg-slate-800/50 border border-white/5 px-3 py-1.5 rounded-lg text-xs">
-            <Clock className="w-3.5 h-3.5 text-indigo-400" />
+          <button
+            onClick={() => setIsTargetModalOpen(true)}
+            className="hidden lg:flex items-center space-x-2 bg-slate-800/50 hover:bg-slate-800/80 border border-white/5 hover:border-indigo-500/30 px-3 py-1.5 rounded-lg text-xs transition cursor-pointer group"
+            title="Daily Target Progress - Click to adjust daily focus target hours"
+          >
+            <Clock className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition" />
             <span className="text-slate-400">Today:</span>
             <span className="text-white font-medium font-mono">
               {formatDuration(todayLog.total || 0)} / {formatDuration(dailyGoal)}
@@ -199,7 +212,8 @@ export const Header = () => {
                 style={{ width: `${progressPct}%` }}
               />
             </div>
-          </div>
+            <span className="text-[10px] text-indigo-400 opacity-60 group-hover:opacity-100 font-mono">✏️</span>
+          </button>
 
           {/* Telegram Phone Notifier Trigger Button */}
           <button
@@ -375,6 +389,12 @@ export const Header = () => {
       <TelegramNotifierModal
         isOpen={isTelegramModalOpen}
         onClose={() => setIsTelegramModalOpen(false)}
+      />
+
+      {/* Daily Focus Target & Streak Explanation Modal */}
+      <DailyTargetModal
+        isOpen={isTargetModalOpen}
+        onClose={() => setIsTargetModalOpen(false)}
       />
     </>
   );
