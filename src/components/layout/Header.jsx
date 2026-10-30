@@ -16,10 +16,12 @@ import {
   Shield,
   Users,
   ChevronDown,
-  Megaphone
+  Megaphone,
+  Bell
 } from 'lucide-react';
 import { getStoredApiKey } from '../../utils/geminiClient.js';
 import { ApiKeyModal } from '../ai/ApiKeyModal.jsx';
+import { TelegramNotifierModal } from '../notifications/TelegramNotifierModal.jsx';
 import { calculateGamification } from '../../utils/gamification.js';
 import { formatDuration } from '../../utils/analyticsCalculators.js';
 
@@ -28,6 +30,7 @@ export const Header = () => {
   const { currentUser, userProfile, isAdmin, logout, claimAdminRole } = useAuth();
   
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [liveStudierCount, setLiveStudierCount] = useState(0);
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
@@ -198,6 +201,16 @@ export const Header = () => {
             </div>
           </div>
 
+          {/* Telegram Phone Notifier Trigger Button */}
+          <button
+            onClick={() => setIsTelegramModalOpen(true)}
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 transition shadow-sm"
+            title="Configure Phone Notifications & Alerts (Telegram)"
+          >
+            <Bell className="w-3.5 h-3.5 text-sky-400" />
+            <span className="hidden md:inline">Phone Alerts</span>
+          </button>
+
           {/* Focus Timer Trigger Button */}
           <button
             onClick={() => setTimerState(prev => ({ ...prev, isOpen: true }))}
@@ -356,6 +369,12 @@ export const Header = () => {
       <ApiKeyModal
         isOpen={isApiKeyModalOpen}
         onClose={() => setIsApiKeyModalOpen(false)}
+      />
+
+      {/* Telegram Phone Notifier Modal */}
+      <TelegramNotifierModal
+        isOpen={isTelegramModalOpen}
+        onClose={() => setIsTelegramModalOpen(false)}
       />
     </>
   );

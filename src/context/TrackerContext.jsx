@@ -3,6 +3,14 @@ import { INITIAL_DATA } from '../data/initialData.js';
 import { soundEngine } from '../utils/audioSynth.js';
 import { useAuth } from './AuthContext.jsx';
 import { pipOverlay } from '../utils/pipOverlay.js';
+import {
+  DEFAULT_TELEGRAM_CONFIG,
+  sendTelegramMessage,
+  buildMorningBriefingMessage,
+  buildInactivityAlertMessage,
+  buildEveningRecapMessage,
+  buildPomodoroCompletedMessage
+} from '../utils/telegramNotifier.js';
 
 const TrackerContext = createContext(null);
 
@@ -278,6 +286,62 @@ export const TrackerProvider = ({ children }) => {
     };
   }, [timerState.isRunning]);
 
+  // ── Automated Scheduled Phone Reminders (Morning 9am, Inactivity 3pm, Evening 9:30pm) ──
+  useEffect(() => {
+    const checkSchedule = () => {
+      try {
+        const tgConfig = JSON.parse(localStorage.getItem('omniprep_telegram_config') || 'null') || DEFAULT_TELEGRAM_CONFIG;
+        if (!tgConfig.enabled) return;
+
+        const now = new Date();
+        const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const userName = currentUser?.displayName || data?.profile?.name || 'Scholar';
+
+        // 1. Morning Daily Mission (Between 9:00 AM and 10:00 AM)
+        if (tgConfig.morningReminder && currentHour === 9 && currentMinute >= 0) {
+          const sentKey = `omniprep_tg_morning_${dateKey}`;
+          if (!localStorage.getItem(sentKey)) {
+            localStorage.setItem(sentKey, 'true');
+            const msg = buildMorningBriefingMessage(data, userName);
+            sendTelegramMessage(tgConfig.botToken, tgConfig.chatId, msg).catch(() => {});
+          }
+        }
+
+        // 2. Afternoon Inactivity Alert (Between 3:00 PM and 4:00 PM if 0 study hours logged today)
+        if (tgConfig.inactivityAlert && currentHour === 15 && currentMinute >= 0) {
+          const sentKey = `omniprep_tg_inactivity_${dateKey}`;
+          if (!localStorage.getItem(sentKey)) {
+            const todayLog = (data.activityLogs || []).find(l => l.date === dateKey);
+            const totalHoursToday = todayLog?.total || 0;
+            // Only alert if user has logged 0 or almost 0 hours
+            if (totalHoursToday < 0.1) {
+              localStorage.setItem(sentKey, 'true');
+              const msg = buildInactivityAlertMessage(data, userName);
+              sendTelegramMessage(tgConfig.botToken, tgConfig.chatId, msg).catch(() => {});
+            }
+          }
+        }
+
+        // 3. Evening Wrap-Up Scorecard (Between 9:30 PM and 10:30 PM)
+        if (tgConfig.eveningRecap && ((currentHour === 21 && currentMinute >= 30) || (currentHour === 22 && currentMinute < 30))) {
+          const sentKey = `omniprep_tg_evening_${dateKey}`;
+          if (!localStorage.getItem(sentKey)) {
+            localStorage.setItem(sentKey, 'true');
+            const msg = buildEveningRecapMessage(data, userName);
+            sendTelegramMessage(tgConfig.botToken, tgConfig.chatId, msg).catch(() => {});
+          }
+        }
+      } catch (_) {}
+    };
+
+    // Run check once on load, then every 60 seconds
+    checkSchedule();
+    const scheduleInterval = setInterval(checkSchedule, 60000);
+    return () => clearInterval(scheduleInterval);
+  }, [data, currentUser]);
+
   // Handler: Log completed focus session into today's activity log
   const logFocusSession = (category, hours) => {
     // Treat any non-empty category or fallback to 'gate'
@@ -328,6 +392,30 @@ export const TrackerProvider = ({ children }) => {
         english: updatedEnglish
       };
     });
+
+    // Send Telegram alert if Pomodoro completion notification is enabled
+    try {
+      const tgConfig = JSON.parse(localStorage.getItem('omniprep_telegram_config') || 'null') || DEFAULT_TELEGRAM_CONFIG;
+      if (tgConfig?.enabled && tgConfig?.pomodoroDoneAlert) {
+        const addedMins = Math.max(1, Math.round(parsedHours * 60));
+        // Compute today's updated total
+        const now2 = new Date();
+        const todayStr2 = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}-${String(now2.getDate()).padStart(2, '0')}`;
+        const existingLogs = data?.activityLogs || [];
+        const tLog = existingLogs.find(l => l.date === todayStr2);
+        const newTotalHours = (tLog?.total || 0) + parsedHours;
+
+        const msg = buildPomodoroCompletedMessage(cleanCat, addedMins, newTotalHours, currentUser?.displayName || data?.profile?.name);
+        sendTelegramMessage(tgConfig.botToken, tgConfig.chatId, msg).catch(() => {
+          // Fallback through backend proxy
+          fetch('/api/notify/telegram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ botToken: tgConfig.botToken, chatId: tgConfig.chatId, text: msg }),
+          }).catch(() => {});
+        });
+      }
+    } catch (_) {}
   };
 
   const updateProfile = (updates) => {

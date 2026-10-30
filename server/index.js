@@ -507,6 +507,41 @@ app.post('/api/ai/english-coach', async (req, res) => {
   }
 });
 
+// ── Telegram Notification API Endpoint ──────────────────────────────────
+app.post('/api/notify/telegram', async (req, res) => {
+  try {
+    const { botToken, chatId, text, parseMode } = req.body;
+    const token = (botToken || process.env.TELEGRAM_BOT_TOKEN || '9046473887:AAFPiAqur4eB32KQIH0TZfTu0fwzZc-80qE').trim();
+    const cid = (chatId || process.env.TELEGRAM_CHAT_ID || '9046473887').trim();
+
+    if (!token || !cid) {
+      return res.status(400).json({ success: false, error: 'Telegram Bot Token or Chat ID missing.' });
+    }
+
+    const tgUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+    const tgRes = await fetch(tgUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: cid,
+        text: text || 'OmniPrep Notification',
+        parse_mode: parseMode || 'HTML',
+        disable_web_page_preview: true
+      }),
+    });
+
+    const json = await tgRes.json();
+    if (!json.ok) {
+      return res.status(tgRes.status || 400).json({ success: false, error: json.description || 'Telegram API rejected message.' });
+    }
+
+    res.json({ success: true, messageId: json.result?.message_id });
+  } catch (err) {
+    console.error('[Telegram API Proxy Error]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // =========================================================
 // PRODUCTION STATIC FILE SERVING (Single-Port Web App)
 // =========================================================
