@@ -14,12 +14,24 @@ export {
   setOpenAIKey,
   getOpenAIModel,
   setOpenAIModel,
+  getOpenAIBaseUrl,
+  setOpenAIBaseUrl,
 
   // Claude
   getClaudeKey,
   setClaudeKey,
   getClaudeModel,
   setClaudeModel,
+  getClaudeBaseUrl,
+  setClaudeBaseUrl,
+
+  // Custom / OpenAI Compatible (DeepSeek, Groq, Ollama, OpenRouter, LM Studio)
+  getCustomKey,
+  setCustomKey,
+  getCustomModel,
+  setCustomModel,
+  getCustomBaseUrl,
+  setCustomBaseUrl,
 
   // Provider selector
   getStoredProvider,

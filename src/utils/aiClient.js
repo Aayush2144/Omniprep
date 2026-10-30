@@ -3,13 +3,19 @@
 // ============================================================
 
 const STORAGE = {
-  provider: 'omniprep_ai_provider',      // 'gemini' | 'openai' | 'claude'
+  provider: 'omniprep_ai_provider',      // 'gemini' | 'openai' | 'claude' | 'custom'
   geminiKey: 'omniprep_gemini_api_key',
   geminiModel: 'omniprep_gemini_model',
+  geminiBaseUrl: 'omniprep_gemini_base_url',
   openaiKey: 'omniprep_openai_api_key',
   openaiModel: 'omniprep_openai_model',
+  openaiBaseUrl: 'omniprep_openai_base_url',
   claudeKey: 'omniprep_claude_api_key',
   claudeModel: 'omniprep_claude_model',
+  claudeBaseUrl: 'omniprep_claude_base_url',
+  customKey: 'omniprep_custom_api_key',
+  customModel: 'omniprep_custom_model',
+  customBaseUrl: 'omniprep_custom_base_url',
 };
 
 // ── Provider persistence ──────────────────────────────────────
@@ -22,6 +28,9 @@ export const setStoredApiKey = (k) =>
   k ? localStorage.setItem(STORAGE.geminiKey, k.trim()) : localStorage.removeItem(STORAGE.geminiKey);
 export const getStoredModel = () => localStorage.getItem(STORAGE.geminiModel) || 'gemini-2.0-flash';
 export const setStoredModel = (m) => m && localStorage.setItem(STORAGE.geminiModel, m);
+export const getGeminiBaseUrl = () => localStorage.getItem(STORAGE.geminiBaseUrl) || '';
+export const setGeminiBaseUrl = (u) =>
+  u ? localStorage.setItem(STORAGE.geminiBaseUrl, u.trim().replace(/\/+$/, '')) : localStorage.removeItem(STORAGE.geminiBaseUrl);
 
 // ── OpenAI ───────────────────────────────────────────────────
 export const getOpenAIKey = () => localStorage.getItem(STORAGE.openaiKey) || '';
@@ -29,6 +38,9 @@ export const setOpenAIKey = (k) =>
   k ? localStorage.setItem(STORAGE.openaiKey, k.trim()) : localStorage.removeItem(STORAGE.openaiKey);
 export const getOpenAIModel = () => localStorage.getItem(STORAGE.openaiModel) || 'gpt-4o-mini';
 export const setOpenAIModel = (m) => m && localStorage.setItem(STORAGE.openaiModel, m);
+export const getOpenAIBaseUrl = () => localStorage.getItem(STORAGE.openaiBaseUrl) || '';
+export const setOpenAIBaseUrl = (u) =>
+  u ? localStorage.setItem(STORAGE.openaiBaseUrl, u.trim().replace(/\/+$/, '')) : localStorage.removeItem(STORAGE.openaiBaseUrl);
 
 // ── Claude ───────────────────────────────────────────────────
 export const getClaudeKey = () => localStorage.getItem(STORAGE.claudeKey) || '';
@@ -36,12 +48,26 @@ export const setClaudeKey = (k) =>
   k ? localStorage.setItem(STORAGE.claudeKey, k.trim()) : localStorage.removeItem(STORAGE.claudeKey);
 export const getClaudeModel = () => localStorage.getItem(STORAGE.claudeModel) || 'claude-3-5-haiku-20241022';
 export const setClaudeModel = (m) => m && localStorage.setItem(STORAGE.claudeModel, m);
+export const getClaudeBaseUrl = () => localStorage.getItem(STORAGE.claudeBaseUrl) || '';
+export const setClaudeBaseUrl = (u) =>
+  u ? localStorage.setItem(STORAGE.claudeBaseUrl, u.trim().replace(/\/+$/, '')) : localStorage.removeItem(STORAGE.claudeBaseUrl);
+
+// ── Custom / OpenAI-Compatible (Ollama, DeepSeek, Groq, OpenRouter, Together, LM Studio, etc.) ──
+export const getCustomKey = () => localStorage.getItem(STORAGE.customKey) || '';
+export const setCustomKey = (k) =>
+  k ? localStorage.setItem(STORAGE.customKey, k.trim()) : localStorage.removeItem(STORAGE.customKey);
+export const getCustomModel = () => localStorage.getItem(STORAGE.customModel) || 'deepseek-chat';
+export const setCustomModel = (m) => m && localStorage.setItem(STORAGE.customModel, m);
+export const getCustomBaseUrl = () => localStorage.getItem(STORAGE.customBaseUrl) || 'https://api.deepseek.com/v1';
+export const setCustomBaseUrl = (u) =>
+  u ? localStorage.setItem(STORAGE.customBaseUrl, u.trim().replace(/\/+$/, '')) : localStorage.removeItem(STORAGE.customBaseUrl);
 
 // ── Active provider helpers ──────────────────────────────────
 export const getActiveProviderKey = () => {
   const p = getStoredProvider();
   if (p === 'openai') return getOpenAIKey();
   if (p === 'claude') return getClaudeKey();
+  if (p === 'custom') return getCustomKey() || 'custom-key'; // some local proxies like Ollama don't require key
   return getStoredApiKey();
 };
 
@@ -77,19 +103,22 @@ async function callGeminiDirect(apiKey, model, systemInstruction, promptText, ex
   return text;
 }
 
-// --- OpenAI Direct REST ----------------------------------------
-async function callOpenAIDirect(apiKey, model, systemInstruction, promptText) {
-  const url = 'https://api.openai.com/v1/chat/completions';
+// --- OpenAI Direct REST (Supports Custom Base URL) -----------------------
+async function callOpenAIDirect(apiKey, model, systemInstruction, promptText, customBaseUrl = null) {
+  const baseUrl = customBaseUrl || getOpenAIBaseUrl() || 'https://api.openai.com/v1';
+  const cleanBase = baseUrl.replace(/\/+$/, '');
+  const url = cleanBase.endsWith('/chat/completions') ? cleanBase : `${cleanBase}/chat/completions`;
+
   const messages = [];
   if (systemInstruction) messages.push({ role: 'system', content: systemInstruction });
   messages.push({ role: 'user', content: promptText });
 
+  const headers = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
   const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers,
     body: JSON.stringify({ model: model || 'gpt-4o-mini', messages, temperature: 0.7 }),
   });
 
@@ -97,19 +126,46 @@ async function callOpenAIDirect(apiKey, model, systemInstruction, promptText) {
     const body = await res.text();
     let msg = body;
     try { msg = JSON.parse(body).error?.message || body; } catch (_) {}
-    throw new Error(`[OpenAI] ${msg}`);
+    throw new Error(`[API Error ${res.status}] ${msg}`);
   }
   const json = await res.json();
   const text = json.choices?.[0]?.message?.content;
-  if (!text) throw new Error('Empty response from OpenAI');
+  if (!text) throw new Error('Empty response from AI service');
   return text;
 }
 
-// --- Claude Direct REST ----------------------------------------
-// NOTE: Claude's API requires CORS proxy because Anthropic doesn't allow browser-direct calls.
-// We route through the backend /api/ai/claude-proxy endpoint.
+// --- Claude Direct REST (with optional custom base URL) -----------------
 async function callClaudeDirect(apiKey, model, systemInstruction, promptText) {
-  // First try backend proxy (supports server-side CORS)
+  const customBaseUrl = getClaudeBaseUrl();
+  // If user provided a custom base URL for Claude/Anthropic proxy
+  if (customBaseUrl) {
+    const cleanBase = customBaseUrl.replace(/\/+$/, '');
+    const url = cleanBase.endsWith('/messages') ? cleanBase : `${cleanBase}/messages`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: model || 'claude-3-5-haiku-20241022',
+        max_tokens: 2048,
+        system: systemInstruction,
+        messages: [{ role: 'user', content: promptText }],
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      let msg = body;
+      try { msg = JSON.parse(body).error?.message || body; } catch (_) {}
+      throw new Error(`[Claude Error ${res.status}] ${msg}`);
+    }
+    const json = await res.json();
+    return json.content?.[0]?.text;
+  }
+
+  // Otherwise route through backend proxy (supports Anthropic CORS)
   const res = await fetch('/api/ai/claude-proxy', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -148,6 +204,13 @@ export async function callAI({ systemInstruction, promptText, expectJson = true 
     if (!apiKey) throw new Error('Please configure your Claude API Key first.');
     const model = getClaudeModel();
     rawText = await callClaudeDirect(apiKey, model, systemInstruction, promptText);
+
+  } else if (provider === 'custom') {
+    // Custom OpenAI-compatible service (DeepSeek, Groq, Ollama, OpenRouter, Together, LM Studio, etc.)
+    const apiKey = getCustomKey();
+    const model = getCustomModel() || 'deepseek-chat';
+    const baseUrl = getCustomBaseUrl() || 'https://api.deepseek.com/v1';
+    rawText = await callOpenAIDirect(apiKey, model, systemInstruction, promptText, baseUrl);
 
   } else {
     // Gemini (default)
