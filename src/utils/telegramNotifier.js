@@ -4,7 +4,7 @@
 
 export const DEFAULT_TELEGRAM_CONFIG = {
   botToken: '9046473887:AAFPiAqur4eB32KQIH0TZfTu0fwzZc-80qE',
-  chatId: '9046473887',
+  chatId: '7418291817', // Aayush personal Telegram user ID
   botUsername: 'Omni_tracker_progress_bot',
   enabled: true,
   morningReminder: true,      // 9:00 AM IST daily briefing

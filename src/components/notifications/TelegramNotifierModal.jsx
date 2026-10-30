@@ -32,7 +32,15 @@ export const TelegramNotifierModal = ({ isOpen, onClose }) => {
   const [config, setConfig] = useState(() => {
     try {
       const saved = localStorage.getItem('omniprep_telegram_config');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Auto-fix if old bot id 9046473887 was saved in user's localStorage
+        if (parsed.chatId === '9046473887') {
+          parsed.chatId = '7418291817';
+          localStorage.setItem('omniprep_telegram_config', JSON.stringify(parsed));
+        }
+        return parsed;
+      }
     } catch (_) {}
     return DEFAULT_TELEGRAM_CONFIG;
   });

@@ -512,7 +512,11 @@ app.post('/api/notify/telegram', async (req, res) => {
   try {
     const { botToken, chatId, text, parseMode } = req.body;
     const token = (botToken || process.env.TELEGRAM_BOT_TOKEN || '9046473887:AAFPiAqur4eB32KQIH0TZfTu0fwzZc-80qE').trim();
-    const cid = (chatId || process.env.TELEGRAM_CHAT_ID || '9046473887').trim();
+    // Default to Aayush's verified chat ID: 7418291817
+    let cid = (chatId || process.env.TELEGRAM_CHAT_ID || '7418291817').trim();
+    if (cid === '9046473887') {
+      cid = '7418291817'; // Auto-correct if bot's own ID was mistakenly passed
+    }
 
     if (!token || !cid) {
       return res.status(400).json({ success: false, error: 'Telegram Bot Token or Chat ID missing.' });
