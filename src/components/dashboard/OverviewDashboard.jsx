@@ -37,7 +37,7 @@ import {
 } from 'recharts';
 import { HeatmapCalendar } from './HeatmapCalendar';
 import { DailyChecklist } from './DailyChecklist';
-import { calculateOverallAnalytics } from '../../utils/analyticsCalculators';
+import { calculateOverallAnalytics, formatDuration } from '../../utils/analyticsCalculators';
 import { calculateGamification } from '../../utils/gamification.js';
 
 export const OverviewDashboard = () => {
@@ -187,10 +187,13 @@ export const OverviewDashboard = () => {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold text-white font-mono">
-              {analytics.todayHours}h <span className="text-xs font-normal text-slate-400">/ {data.profile?.dailyHourGoal || 7.5}h</span>
+              {formatDuration(analytics.todayHours)}{' '}
+              <span className="text-xs font-normal text-slate-400 font-sans">
+                / {formatDuration(data.profile?.dailyHourGoal || 7.5)}
+              </span>
             </div>
             <div className="text-[11px] text-slate-400 mt-1">
-              {Math.round((analytics.todayHours / (data.profile?.dailyHourGoal || 7.5)) * 100)}% of daily target reached
+              {Math.round(((analytics.todayHours || 0) / (data.profile?.dailyHourGoal || 7.5)) * 100)}% of daily target reached
             </div>
           </div>
         </div>
@@ -205,7 +208,8 @@ export const OverviewDashboard = () => {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold text-white font-mono">
-              {analytics.avgDailyHours7d}h <span className="text-xs font-normal text-slate-400">/ day</span>
+              {formatDuration(analytics.avgDailyHours7d)}{' '}
+              <span className="text-xs font-normal text-slate-400 font-sans">/ day</span>
             </div>
             <div className="text-[11px] text-emerald-400 mt-1 flex items-center gap-1">
               <Zap className="w-3 h-3" /> High consistency tempo
@@ -242,7 +246,7 @@ export const OverviewDashboard = () => {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold text-white font-mono">
-              {analytics.totalHoursAllTime}h
+              {formatDuration(analytics.totalHoursAllTime)}
             </div>
             <div className="text-[11px] text-slate-400 mt-1">
               Logged across 4 domains
@@ -280,7 +284,7 @@ export const OverviewDashboard = () => {
               </div>
 
               <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs">
-                <span className="text-slate-400">Today: <strong className="text-white">{p.hoursToday}h</strong></span>
+                <span className="text-slate-400">Today: <strong className="text-white">{formatDuration(p.hoursToday)}</strong></span>
                 <span className="text-[11px] font-semibold text-white group-hover:underline flex items-center gap-1">
                   Open Hub <ArrowRight className="w-3 h-3" />
                 </span>

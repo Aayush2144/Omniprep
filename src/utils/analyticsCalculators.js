@@ -1,4 +1,17 @@
-// Utility functions to compute analytics across all preparation pillars
+// Helper: Format raw decimal hours into natural human-readable "Xh Ym" or "Ym" format
+export const formatDuration = (decimalHours) => {
+  const num = Number(decimalHours) || 0;
+  if (num <= 0) return '0m';
+
+  const totalMinutes = Math.round(num * 60);
+  if (totalMinutes < 60) {
+    return `${totalMinutes}m`;
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+};
 
 export const calculateOverallAnalytics = (data) => {
   const logs = data.activityLogs || [];
