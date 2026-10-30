@@ -21,6 +21,7 @@ import {
   createAnnouncement,
   toggleAnnouncement
 } from './db.js';
+import { startTelegramBotListener } from './telegramBot.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -569,4 +570,6 @@ if (fs.existsSync(distPath)) {
 // Start listening
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 [Server] OmniPrep Multi-User Production Server running on port ${PORT}`);
+  // Start interactive Telegram Bot polling listener
+  startTelegramBotListener();
 });
