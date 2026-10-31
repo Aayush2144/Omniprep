@@ -14,7 +14,21 @@ export const DEFAULT_TELEGRAM_CONFIG = {
   eveningRecap: true,         // 9:30 PM IST final scorecard
   eveningTime: '21:30',
   pomodoroDoneAlert: true,    // Send message whenever user finishes a focus round
+  timezone: 'Asia/Kolkata',   // India Standard Time (UTC+5:30)
 };
+
+export async function syncTelegramConfigToServer(config) {
+  try {
+    const res = await fetch('/api/telegram/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    });
+    return await res.json();
+  } catch (err) {
+    console.warn('Failed to sync telegram config to server:', err);
+  }
+}
 
 // Low-level sender
 export async function sendTelegramMessage(botToken, chatId, text, parseMode = 'HTML') {

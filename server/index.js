@@ -22,6 +22,7 @@ import {
   toggleAnnouncement
 } from './db.js';
 import { startTelegramBotListener } from './telegramBot.js';
+import { startNotificationScheduler, getSchedulerConfig, updateSchedulerConfig } from './scheduler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -547,6 +548,20 @@ app.post('/api/notify/telegram', async (req, res) => {
   }
 });
 
+// ── Telegram Notification Config Endpoints ──────────────────────────────
+app.get('/api/telegram/config', (req, res) => {
+  res.json({ success: true, config: getSchedulerConfig() });
+});
+
+app.post('/api/telegram/config', (req, res) => {
+  try {
+    const updated = updateSchedulerConfig(req.body);
+    res.json({ success: true, config: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // =========================================================
 // PRODUCTION STATIC FILE SERVING (Single-Port Web App)
 // =========================================================
@@ -572,4 +587,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 [Server] OmniPrep Multi-User Production Server running on port ${PORT}`);
   // Start interactive Telegram Bot polling listener
   startTelegramBotListener();
+  // Start 24/7 background notification scheduler and keep-alive
+  startNotificationScheduler();
 });
