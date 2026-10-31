@@ -133,7 +133,7 @@ Your daily mission for today is set:
 ${pending.slice(0, 5).map(r => `• <b>[ ]</b> ${r.title}`).join('\n') || '• Open OmniPrep to set your top 3 tasks'}
 
 ⏰ Jump in, start your first Pomodoro focus round, and let's crush the daily target!
-🔗 <a href="https://omniprep.onrender.com">Open OmniPrep Suite</a>`;
+🔗 <a href="https://omniprep-wg7a.onrender.com">Open OmniPrep Suite</a>`;
 }
 
 // 3. Inactivity Alert (Sent at 3:00 PM if user has logged 0 study hours)
@@ -147,7 +147,7 @@ Hey ${userName || profile.name || 'Scholar'}, the afternoon is slipping away and
 ⏱️ <b>Remaining Goal:</b> ${formatDuration(profile.dailyHourGoal || 7.5)} needed today.
 
 👉 Just start with ONE 25-minute Pomodoro round to build momentum!
-🔗 <a href="https://omniprep.onrender.com">Start 25m Focus Round Now</a>`;
+🔗 <a href="https://omniprep-wg7a.onrender.com">Start 25m Focus Round Now</a>`;
 }
 
 // 4. Evening Recap & Scorecard (Sent at 9:30 PM)

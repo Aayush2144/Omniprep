@@ -135,7 +135,7 @@ export const TelegramNotifierModal = ({ isOpen, onClose }) => {
 
   const keepAliveUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/api/health`
-    : 'https://omniprep.onrender.com/api/health';
+    : 'https://omniprep-wg7a.onrender.com/api/health';
 
   const handleCopyKeepalive = () => {
     navigator.clipboard.writeText(keepAliveUrl);

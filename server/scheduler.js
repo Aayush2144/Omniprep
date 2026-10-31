@@ -140,7 +140,7 @@ Your daily mission for today is set:
 ${pending.slice(0, 5).map(r => `• <b>[ ]</b> ${r.title}`).join('\n') || '• Review your OmniPrep goals & start session'}
 
 ⏰ Jump in, start your first Pomodoro round, and conquer today's target!
-🚀 <a href="https://omniprep.onrender.com">Open OmniPrep Suite</a>`;
+🚀 <a href="https://omniprep-wg7a.onrender.com">Open OmniPrep Suite</a>`;
 
   console.log(`[Server Scheduler] ☀️ Dispatching Morning Mission to ${config.chatId}...`);
   await sendTelegramMessage(config.botToken, config.chatId, msg);
@@ -168,7 +168,7 @@ Hey ${userName}, the afternoon is slipping away and you haven't started your stu
 ⏱️ <b>Remaining Goal:</b> ${formatDuration(dailyGoal)} needed today.
 
 👉 Just start with ONE 25-minute Pomodoro round to build momentum!
-🚀 <a href="https://omniprep.onrender.com">Start 25m Focus Round Now</a>`;
+🚀 <a href="https://omniprep-wg7a.onrender.com">Start 25m Focus Round Now</a>`;
 
   console.log(`[Server Scheduler] ⚠️ Dispatching Inactivity Alert to ${config.chatId}...`);
   await sendTelegramMessage(config.botToken, config.chatId, msg);
@@ -251,7 +251,7 @@ export async function checkAutomatedSchedules() {
 let keepAliveInterval = null;
 
 export function startKeepAliveWorker() {
-  const targetUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL || 'https://omniprep.onrender.com';
+  const targetUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL || 'https://omniprep-wg7a.onrender.com';
   console.log(`[KeepAlive] 🟢 Starting 24/7 Keep-Alive self-pinger for: ${targetUrl}`);
 
   const ping = async () => {

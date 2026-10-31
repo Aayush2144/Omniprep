@@ -160,7 +160,7 @@ ${renderProgressBar(todayLog.total || 0, dailyGoal)}
 
 ${(todayLog.total || 0) >= dailyGoal ? '🏆 <b>Daily Target Achieved! Great job!</b>' : `⏳ <b>${formatDuration(Math.max(0, dailyGoal - (todayLog.total || 0)))}</b> remaining to reach daily goal.`}
 
-🚀 <a href="https://omniprep.onrender.com">Open OmniPrep Suite</a>`;
+🚀 <a href="https://omniprep-wg7a.onrender.com">Open OmniPrep Suite</a>`;
 
   await sendTelegramResponse(chatId, msg);
 }
